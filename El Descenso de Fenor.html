@@ -1,0 +1,3199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Descenso de Fenor — Stream Reward</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Cinzel+Decorative:wght@700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#000;
+    display:flex; justify-content:center; align-items:center;
+    height:100vh; overflow:hidden;
+    font-family:'Share Tech Mono',monospace;
+  }
+  #game-container { position:relative; width:800px; height:600px; }
+  canvas { display:block; }
+  .vignette {
+    position:absolute; inset:0; pointer-events:none; z-index:10;
+    background:radial-gradient(ellipse at center, transparent 38%, rgba(0,0,0,0.88) 100%);
+  }
+  .crt {
+    position:absolute; inset:0; pointer-events:none; z-index:11;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0.15) 0px,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 2px);
+    animation:flicker 0.15s infinite;
+  }
+  @keyframes flicker {
+    0%,100%{opacity:1} 91%{opacity:0.98} 93%{opacity:0.90} 95%{opacity:0.97}
+  }
+  .noise {
+    position:absolute; inset:0; pointer-events:none; z-index:12; opacity:0.045;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:200px 200px;
+    animation:noiseAnim 0.18s steps(1) infinite;
+  }
+  @keyframes noiseAnim {
+    0%{background-position:0 0} 20%{background-position:-50px 25px}
+    40%{background-position:100px -80px} 60%{background-position:30px 40px}
+    80%{background-position:-70px -20px} 100%{background-position:0 0}
+  }
+  #ui-overlay {
+    position:absolute; inset:0; z-index:20;
+    display:flex; align-items:center; justify-content:center;
+    pointer-events:none;
+  }
+  #name-panel {
+    background:rgba(0,0,0,0.92); border:1px solid #330000;
+    padding:24px 32px; text-align:center; color:#cc0000;
+    font-family:'Share Tech Mono',monospace; pointer-events:all;
+    display:none;
+  }
+  #name-panel h2 { font-family:'Cinzel Decorative',serif; font-size:18px; margin-bottom:14px; letter-spacing:2px; }
+  #name-panel input {
+    background:#0a0a0a; border:1px solid #550000; color:#cc0000;
+    font-family:'Share Tech Mono',monospace; font-size:16px;
+    padding:6px 12px; width:220px; text-align:center; margin-bottom:12px;
+    outline:none;
+  }
+  #name-panel .class-row { display:flex; gap:10px; margin-bottom:16px; justify-content:center; }
+  .class-btn {
+    background:#0a0a0a; border:1px solid #330000; color:#888; padding:8px 14px;
+    cursor:pointer; font-family:'Share Tech Mono',monospace; font-size:11px;
+    transition:all 0.15s; text-align:center; min-width:90px;
+  }
+  .class-btn:hover, .class-btn.selected { border-color:#cc0000; color:#cc0000; background:#1a0000; }
+  .class-btn .cls-name { font-size:13px; color:inherit; }
+  .class-btn .cls-stats { font-size:9px; color:#555; margin-top:4px; }
+  .class-btn.selected .cls-stats { color:#884444; }
+  #start-btn {
+    background:#1a0000; border:1px solid #880000; color:#cc0000;
+    padding:10px 28px; cursor:pointer; font-family:'Share Tech Mono',monospace;
+    font-size:15px; letter-spacing:2px; transition:all 0.15s;
+  }
+  #start-btn:hover { background:#2a0000; border-color:#cc0000; }
+  #chest-overlay {
+    position:absolute; inset:0; z-index:25; background:rgba(0,0,0,0.88);
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    font-family:'Share Tech Mono',monospace; text-align:center;
+    pointer-events:all;
+  }
+  #chest-overlay h2 { font-family:'Cinzel Decorative',serif; font-size:22px; color:#aaaa00; margin-bottom:6px; }
+  #chest-overlay .chest-art { font-size:52px; margin:16px 0; }
+  #chest-overlay .loot-box { background:#0a0a00; border:1px solid #555500; padding:20px 32px; margin:10px 0; min-width:320px; }
+  #chest-overlay .loot-item { color:#ffcc00; font-size:15px; margin:6px 0; }
+  #chest-overlay .chest-btn {
+    background:#111100; border:1px solid #887700; color:#ffcc00;
+    padding:10px 28px; cursor:pointer; font-family:'Share Tech Mono',monospace;
+    font-size:15px; margin-top:10px; letter-spacing:2px; transition:all 0.15s;
+  }
+  #chest-overlay .chest-btn:hover { background:#1a1a00; border-color:#ccaa00; }
+</style>
+</head>
+<body>
+<div id="game-container">
+  <div class="vignette"></div>
+  <div class="crt"></div>
+  <div class="noise"></div>
+  <div id="ui-overlay">
+    <div id="name-panel">
+      <h2>IDENTIFICA AL DESCENDIENTE</h2>
+      <div style="margin-bottom:8px;font-size:11px;color:#555;letter-spacing:1px">NOMBRE DEL PARTICIPANTE</div>
+      <input id="player-name-input" type="text" maxlength="20" placeholder="Escribe aquí..."/>
+      <div style="font-size:11px;color:#555;letter-spacing:1px;margin-bottom:10px">CLASE</div>
+      <div class="class-row" id="class-row"></div>
+      <button id="start-btn">[ DESCENDER ]</button>
+    </div>
+  </div>
+  <div id="chest-overlay">
+    <h2>☽ COFRE DEL DESTINO ☽</h2>
+    <p style="color:#777;font-size:13px;margin-bottom:8px">Lo desconocido aguarda en su interior.</p>
+    <div class="chest-art" id="chest-art">🪦</div>
+    <div id="chest-content"></div>
+    <button class="chest-btn" id="chest-open-btn" style="display:none">[ ABRIR EL COFRE ]</button>
+    <button class="chest-btn" id="chest-restart-btn" style="display:none">[ NUEVA PARTIDA ]</button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+<script>
+
+// ═══════════════════════════════════════════════════════════════
+//  AUDIO ENGINE — Dark, atmospheric, no clicks/pops
+// ═══════════════════════════════════════════════════════════════
+const SFX = (() => {
+  let ctx = null;
+  function _ctx(){
+    if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended') ctx.resume();
+    return ctx;
+  }
+
+  // Crea un gain con micro-fade in/out para evitar clicks
+  function _gain(ac, vol, start, dur, attack=0.008, release=0.04){
+    let g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, start);
+    g.gain.linearRampToValueAtTime(vol, start + attack);
+    g.gain.setValueAtTime(vol, start + dur - release);
+    g.gain.linearRampToValueAtTime(0.0001, start + dur);
+    return g;
+  }
+
+  // Masterbus con compresor suave para evitar saturacion
+  function _master(ac){
+    let comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.knee.value      = 10;
+    comp.ratio.value     = 4;
+    comp.attack.value    = 0.003;
+    comp.release.value   = 0.15;
+    comp.connect(ac.destination);
+    return comp;
+  }
+
+  function _osc(freq, type, start, dur, vol, ac, dest){
+    let out = dest || ac.destination;
+    let g = _gain(ac, vol, start, dur);
+    let o = ac.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, start);
+    o.connect(g); g.connect(out);
+    o.start(start); o.stop(start + dur + 0.05);
+  }
+
+  function _slide(f0, f1, type, start, dur, vol, ac, dest){
+    let out = dest || ac.destination;
+    let g = _gain(ac, vol, start, dur);
+    let o = ac.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, start);
+    o.frequency.exponentialRampToValueAtTime(f1, start + dur);
+    o.connect(g); g.connect(out);
+    o.start(start); o.stop(start + dur + 0.05);
+  }
+
+  function _noise(start, dur, vol, ac, lp=600, hp=0, dest){
+    let out = dest || ac.destination;
+    let bufLen = Math.ceil(ac.sampleRate * dur);
+    let buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    let d = buf.getChannelData(0);
+    for(let i=0;i<bufLen;i++) d[i] = Math.random()*2 - 1;
+    let src = ac.createBufferSource(); src.buffer = buf;
+    let node = src;
+    if(lp){ let f=ac.createBiquadFilter(); f.type='lowpass';  f.frequency.value=lp; node.connect(f); node=f; }
+    if(hp){ let f=ac.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; node.connect(f); node=f; }
+    let g = _gain(ac, vol, start, dur, 0.005, 0.05);
+    node.connect(g); g.connect(out);
+    src.start(start); src.stop(start + dur + 0.05);
+  }
+
+  function _vibrato(freq, lfoHz, depth, type, start, dur, vol, ac, dest){
+    let out = dest || ac.destination;
+    let g = _gain(ac, vol, start, dur);
+    let o = ac.createOscillator(); o.type = type; o.frequency.value = freq;
+    let lfo = ac.createOscillator(); lfo.frequency.value = lfoHz;
+    let lfoG = ac.createGain(); lfoG.gain.value = depth;
+    lfo.connect(lfoG); lfoG.connect(o.frequency);
+    o.connect(g); g.connect(out);
+    lfo.start(start); o.start(start);
+    lfo.stop(start+dur+0.05); o.stop(start+dur+0.05);
+  }
+
+  function _play(fn){ try{ fn(_ctx()); } catch(e){} }
+
+  // ── MENÚ / NAVEGACIÓN ─────────────────────────────────────
+
+  function btnHover(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.06, 0.06, ac, 260, 55, m);
+      _osc(78, 'sine', t, 0.05, 0.04, ac, m);
+    });
+  }
+
+  function btnClick(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.09, 0.14, ac, 200, 0, m);
+      _slide(100, 32, 'sine', t, 0.12, 0.13, ac, m);
+    });
+  }
+
+  function gameStart(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      let o=ac.createOscillator();
+      let g=_gain(ac, 0.28, t, 2.4, 0.6, 0.8);
+      o.type='sine'; o.frequency.value=55;
+      o.connect(g); g.connect(m); o.start(t); o.stop(t+2.6);
+      _osc(110,'sine',t+0.2,2.0,0.1,ac,m);
+      _osc(82,'sine',t+0.4,1.7,0.06,ac,m);
+      _noise(t+0.7, 1.4, 0.05, ac, 350, 0, m);
+    });
+  }
+
+  function sceneTransition(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _slide(80, 22, 'sine', t, 0.35, 0.1, ac, m);
+      _noise(t, 0.28, 0.07, ac, 160, 0, m);
+      _osc(27, 'sine', t+0.08, 0.4, 0.1, ac, m);
+    });
+  }
+
+  // ── COMBATE ───────────────────────────────────────────────
+
+  function playerHit(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.07, 0.22, ac, 420, 50, m);
+      _slide(130, 48, 'sine', t, 0.14, 0.14, ac, m);
+      _osc(48, 'sine', t, 0.1, 0.1, ac, m);
+    });
+  }
+
+  function critHit(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.04, 0.3, ac, 3000, 180, m);
+      _noise(t+0.035, 0.18, 0.22, ac, 260, 0, m);
+      _slide(170, 30, 'sine', t, 0.25, 0.22, ac, m);
+      _osc(25, 'sine', t+0.02, 0.3, 0.18, ac, m);
+    });
+  }
+
+  function miss(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.07, 0.06, ac, 1600, 650, m);
+      _slide(340, 85, 'sine', t, 0.09, 0.04, ac, m);
+    });
+  }
+
+  function playerTakesHit(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.09, 0.24, ac, 360, 0, m);
+      _slide(88, 36, 'sine', t, 0.16, 0.18, ac, m);
+      _osc(40, 'sine', t+0.02, 0.22, 0.12, ac, m);
+    });
+  }
+
+  function limbLost(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.04, 0.35, ac, 3800, 300, m);
+      _noise(t+0.04, 0.32, 0.28, ac, 130, 0, m);
+      _slide(70, 18, 'sine', t, 0.45, 0.24, ac, m);
+      _osc(20, 'sine', t+0.06, 0.55, 0.2, ac, m);
+      _slide(2600, 1000, 'sine', t+0.07, 0.7, 0.02, ac, m);
+    });
+  }
+
+  function victory(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _vibrato(110, 3, 6, 'sine', t, 1.4, 0.12, ac, m);
+      _osc(73, 'sine', t+0.12, 1.1, 0.08, ac, m);
+      _noise(t, 0.3, 0.04, ac, 260, 0, m);
+    });
+  }
+
+  function bossEncounter(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      for(let i=0;i<5;i++){
+        let tt=t+i*0.32;
+        _osc(24+(i%2)*8, 'sine', tt, 0.28, 0.18-i*0.02, ac, m);
+        _noise(tt, 0.2, 0.05, ac, 160, 0, m);
+      }
+      _vibrato(34, 6, 11, 'sine', t, 1.7, 0.1, ac, m);
+      _noise(t+0.4, 1.3, 0.04, ac, 300, 0, m);
+    });
+  }
+
+  function enemySpecial(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _vibrato(60, 11, 22, 'sine', t, 0.7, 0.14, ac, m);
+      _osc(30, 'sine', t, 0.6, 0.12, ac, m);
+      _noise(t+0.15, 0.45, 0.05, ac, 220, 0, m);
+    });
+  }
+
+  function flee(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      for(let i=0;i<4;i++){
+        _noise(t+i*0.08, 0.06, 0.16, ac, 300, 40, m);
+        _slide(72-i*7, 26, 'sine', t+i*0.08, 0.07, 0.09, ac, m);
+      }
+    });
+  }
+
+  // ── EVENTOS ───────────────────────────────────────────────
+
+  function eventChoice(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.13, 0.05, ac, 1400, 500, m);
+      _slide(155, 78, 'sine', t, 0.11, 0.07, ac, m);
+    });
+  }
+
+  function eventGood(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _vibrato(110, 4, 5, 'sine', t, 0.9, 0.09, ac, m);
+      _osc(82, 'sine', t+0.12, 0.7, 0.06, ac, m);
+      _noise(t, 0.2, 0.03, ac, 260, 0, m);
+    });
+  }
+
+  function eventBad(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _osc(50, 'sine', t, 0.7, 0.14, ac, m);
+      _osc(53, 'sine', t, 0.7, 0.12, ac, m);
+      _noise(t+0.1, 0.55, 0.07, ac, 220, 0, m);
+      _slide(110, 26, 'sine', t+0.24, 0.5, 0.1, ac, m);
+    });
+  }
+
+  function diceRoll(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      for(let i=0;i<10;i++){
+        let tt=t+i*0.036+Math.random()*0.018;
+        _noise(tt, 0.032, 0.12+Math.random()*0.1, ac, 700+Math.random()*350, 80, m);
+        _osc(52+Math.random()*36, 'sine', tt, 0.025, 0.06, ac, m);
+      }
+    });
+  }
+
+  function diceResult(good){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      if(good){
+        _vibrato(110, 3, 4, 'sine', t, 0.8, 0.1, ac, m);
+        _osc(82, 'sine', t+0.09, 0.6, 0.06, ac, m);
+      } else {
+        _osc(50, 'sine', t, 0.6, 0.14, ac, m);
+        _osc(47, 'sine', t+0.02, 0.65, 0.12, ac, m);
+        _noise(t+0.1, 0.45, 0.07, ac, 180, 0, m);
+      }
+    });
+  }
+
+  function advance(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _noise(t, 0.06, 0.12, ac, 250, 0, m);
+      _slide(62, 30, 'sine', t, 0.1, 0.12, ac, m);
+    });
+  }
+
+  // ── MUERTE / GAME OVER ────────────────────────────────────
+
+  function playerDeath(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      for(let i=0;i<3;i++){
+        let tt=t+i*0.44*(1+i*0.26);
+        _slide(50, 26, 'sine', tt, 0.34, 0.2-i*0.05, ac, m);
+        _noise(tt, 0.16, 0.08, ac, 180, 0, m);
+      }
+      _vibrato(25, 0.5, 3, 'sine', t+1.6, 3.0, 0.14, ac, m);
+      _noise(t+1.6, 2.4, 0.04, ac, 130, 0, m);
+    });
+  }
+
+  function insanityDeath(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      _vibrato(220, 0.5, 3, 'sine', t, 0.5, 0.1, ac, m);
+      _vibrato(220, 9,  42, 'sine', t+0.5, 0.6, 0.1, ac, m);
+      _vibrato(220, 24, 90, 'sine', t+1.1, 0.9, 0.1, ac, m);
+      _noise(t,     0.4,  0.03, ac, 560, 0, m);
+      _noise(t+0.5, 0.5,  0.06, ac, 750, 80, m);
+      _noise(t+1.0, 1.0,  0.1,  ac, 1050, 160, m);
+      _osc(26, 'sine', t+1.2, 1.0, 0.14, ac, m);
+    });
+  }
+
+  function gameOver(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      let o=ac.createOscillator();
+      let g=_gain(ac, 0.3, t, 3.8, 0.08, 1.2);
+      o.type='sine'; o.frequency.value=41;
+      o.connect(g); g.connect(m); o.start(t); o.stop(t+4.0);
+      _osc(82,'sine',t,3.2,0.14,ac,m);
+      _osc(61,'sine',t+0.06,3.2,0.09,ac,m);
+      _noise(t, 0.3, 0.07, ac, 160, 0, m);
+      _osc(41,'sine',t+1.4,2.2,0.07,ac,m);
+    });
+  }
+
+  function chestOpen(){
+    _play(ac=>{ let t=ac.currentTime;
+      let m=_master(ac);
+      // Nota base que sube levemente — sensación de apertura
+      _slide(82, 110, 'sine', t, 0.6, 0.1, ac, m);
+      // Vibrato suave encima, igual que victory pero más corto
+      _vibrato(110, 3, 5, 'sine', t+0.5, 1.2, 0.1, ac, m);
+      // Quinta justa por debajo, da cuerpo sin épica
+      _osc(73, 'sine', t+0.6, 1.0, 0.07, ac, m);
+      // Toque de ruido muy suave al abrir
+      _noise(t, 0.12, 0.05, ac, 800, 0, m);
+    });
+  }
+
+  return {
+    btnClick, btnHover, gameStart, sceneTransition,
+    playerHit, critHit, miss, playerTakesHit, limbLost,
+    victory, bossEncounter, enemySpecial, flee,
+    eventChoice, eventGood, eventBad, diceRoll, diceResult, advance,
+    playerDeath, insanityDeath, gameOver, chestOpen
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+//  GLOBALS
+// ═══════════════════════════════════════════════════════════════
+const W = 800, H = 600;
+const C = {
+  BLACK:0x000000, DARK:0x0a0a0a, GREY:0x1a1a1a, ASH:0x2d2d2d,
+  BONE:0x888888, WHITE:0xcccccc, RED:0x8b0000, BLOOD:0xcc0000, BRIGHT:0xff2222,
+};
+
+// ─── CLASSES ────────────────────────────────────────────────────
+const CLASSES = [
+  {
+    id:'guerrero', name:'GUERRERO',
+    stats:'TORSO+·CAB+·DMG+5',
+    // HP by part: head, torso, armL, armR, legL, legR
+    partHp:{head:28, torso:80, armL:32, armR:32, legL:36, legR:36},
+    dmg:5, eva:0, acc:0,
+    desc:'Resistente y letal.'
+  },
+  {
+    id:'asesino', name:'ASESINO',
+    stats:'ACC+15·CRIT+·EVA+10',
+    partHp:{head:22, torso:55, armL:26, armR:26, legL:28, legR:28},
+    dmg:3, eva:10, acc:15,
+    desc:'Preciso y esquivo.'
+  },
+  {
+    id:'berserker', name:'BERSERKER',
+    stats:'DMG+12·TORSO-·CAB-',
+    partHp:{head:18, torso:50, armL:30, armR:30, legL:32, legR:32},
+    dmg:12, eva:0, acc:-5,
+    desc:'Daño extremo, frágil.'
+  },
+  {
+    id:'hombre_rata', name:'HOMBRE RATA',
+    stats:'EVA+25·MORD+·CAB-',
+    partHp:{head:16, torso:58, armL:24, armR:24, legL:30, legR:30},
+    dmg:4, eva:25, acc:8,
+    desc:'Esquivo y traicionero. Muerde fuerte.'
+  },
+];
+
+// ─── INSANITY DEATH MESSAGES ────────────────────────────────────
+const INSANITY_MSGS = [
+  'Tu mente cedió a la locura.\nNadie te recordará.',
+  'Las voces ganaron.\nEl descenso te consumió desde adentro.',
+  'No moriste.\nSimplemente dejaste de ser.',
+  'La oscuridad no te mató.\nTú se la diste voluntariamente.',
+  'Tus últimas palabras no eran tuyas.\nAlgo más las dijo con tu boca.',
+  'El nombre que tenías ya no existe.\nLo que queda no merece uno.',
+];
+
+// ─── PLAYER NAME & CLASS ────────────────────────────────────────
+let PLAYER_NAME = 'DESCENDIENTE';
+let PLAYER_CLASS = CLASSES[0];
+
+// ─── STATE ──────────────────────────────────────────────────────
+const STATE = {
+  reset(){
+    let cls = PLAYER_CLASS;
+    let ph = cls.partHp;
+    // All parts have independent HP pools
+    // torso/head death = game over; limbs = penalties only
+    this.parts = {
+      head:  {cur:ph.head,  max:ph.head,  severed:false},
+      torso: {cur:ph.torso, max:ph.torso, severed:false},
+      armL:  {cur:ph.armL,  max:ph.armL,  severed:false},
+      armR:  {cur:ph.armR,  max:ph.armR,  severed:false},
+      legL:  {cur:ph.legL,  max:ph.legL,  severed:false},
+      legR:  {cur:ph.legR,  max:ph.legR,  severed:false},
+    };
+    this.level = 1;
+    this.log = [];
+    this.gold = 0;
+    this.buffs = {
+      evasion: cls.eva,
+      damage: cls.dmg,
+      accuracy: cls.acc,
+    };
+    this.sanity = 100;
+    this.deathCause = 'combat';
+    this.classId = cls.id;
+    this.coinUsed = false;
+  },
+  addLog(msg){
+    this.log.unshift(msg);
+    if(this.log.length>60) this.log.pop();
+  },
+  // Distribute healing across all parts that are below max (including head & torso)
+  // Only distributes to non-severed parts
+  healDistribute(amount){
+    let msgs = [];
+    // Find parts that need healing and are not severed (limbs can be severed, head/torso won't be severed but can be low)
+    let needy = Object.entries(this.parts).filter(([k,p])=> !p.severed && p.cur < p.max);
+    if(needy.length === 0) return ['Ya estás al máximo en todo.'];
+    let share = Math.floor(amount / needy.length);
+    let remainder = amount - share * needy.length;
+    needy.forEach(([k,p],i)=>{
+      let gain = share + (i===0?remainder:0);
+      let actual = Math.min(gain, p.max - p.cur);
+      p.cur += actual;
+      if(actual>0) msgs.push(`+${actual} ${partName(k)}`);
+    });
+    return msgs;
+  },
+  getSanityPenalties(){
+    if(this.sanity>=50) return {acc:0,dmg:0};
+    let factor=(50-this.sanity)/50;
+    return { acc:Math.round(factor*30), dmg:Math.round(factor*10) };
+  },
+  getLimbPenalties(){
+    let accLimb=0, eva=0;
+    let p=this.parts;
+    if(p.armL.severed) accLimb+=25;
+    if(p.armR.severed) accLimb+=25;
+    if(p.armL.severed&&p.armR.severed) accLimb+=15;
+    if(p.legL.severed||p.legR.severed) eva+=30;
+    if(p.legL.severed&&p.legR.severed) eva+=20;
+    if(p.head.severed) accLimb+=50;
+    let san=this.getSanityPenalties();
+    let accSan=san.acc;
+    let accBuff=this.buffs.accuracy||0;
+    // acc neto para cálculos de combate
+    let acc=Math.max(0, accLimb+accSan-accBuff);
+    return {acc, eva, accLimb, accSan, accBuff};
+  },
+  getTotalDmgPenalty(){ return this.getSanityPenalties().dmg; },
+  // Returns true if this part kill caused death
+  damagePart(partKey, dmg){
+    let p = this.parts[partKey];
+    if(!p || p.severed) return false;
+    p.cur = Math.max(0, p.cur - dmg);
+    return p.cur <= 0;
+  },
+  // Sever a limb (not torso)
+  severLimb(partKey){
+    let p = this.parts[partKey];
+    if(!p || partKey==='torso') return false;
+    p.severed = true;
+    p.cur = 0;
+    return true;
+  },
+  isAlive(){
+    return this.parts.head.cur > 0 && !this.parts.head.severed
+        && this.parts.torso.cur > 0;
+  },
+};
+STATE.reset();
+
+// ─── HELPERS ────────────────────────────────────────────────────
+function rnd(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function chance(pct){ return Math.random()*100 < pct; }
+function partName(k){ return {head:'Cabeza',torso:'Torso',armL:'Brazo Izq.',armR:'Brazo Der.',legL:'Pierna Izq.',legR:'Pierna Der.',nucleo:'Núcleo',masa:'Masa',tallo:'Tallo'}[k]||k; }
+function sanColor(s){ return s>60?'#22aa22':s>30?'#aaaa00':'#cc0000'; }
+function clampSanity(){ STATE.sanity=Math.max(0,Math.min(100,STATE.sanity)); }
+
+// ─── LOOT TABLE ─────────────────────────────────────────────────
+const LOOT_TABLE = [
+  { weight:5,  prize:'★ KEY DE STEAM x2',           icon:'🎮🎮', color:'#ffcc00' },
+  { weight:8,  prize:'★ KEY DE STEAM',               icon:'🎮',   color:'#ffaa00' },
+  { weight:15, prize:'ROL SOBREVIVIENTE en Discord', icon:'🏆',   color:'#44aaff' },
+  { weight:5,  prize:'COFRE VACÍO',                  icon:'💀',   color:'#444444', empty:true },
+];
+function rollLoot(){
+  let total=LOOT_TABLE.reduce((s,l)=>s+l.weight,0);
+  let r=Math.random()*total;
+  let acc=0;
+  for(let l of LOOT_TABLE){ acc+=l.weight; if(r<acc) return l; }
+  return LOOT_TABLE[LOOT_TABLE.length-1];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE: MENU
+// ═══════════════════════════════════════════════════════════════
+class SceneMenu extends Phaser.Scene {
+  constructor(){ super('SceneMenu'); }
+  create(){
+    this.add.rectangle(W/2,H/2,W,H,C.BLACK);
+    for(let i=0;i<22;i++){
+      let x=rnd(20,780), y=rnd(0,80), h2=rnd(50,220);
+      this.add.rectangle(x,y+h2/2,2,h2,C.RED,0.55);
+      this.add.circle(x,y+h2,4,C.RED,0.75);
+    }
+    this.add.text(W/2,155,'EL\nDESCENSO',{
+      fontFamily:'Cinzel Decorative',fontSize:'72px',color:'#cc0000',align:'center',
+      stroke:'#000',strokeThickness:6,shadow:{color:'#ff0000',blur:30,fill:true}
+    }).setOrigin(0.5);
+    this.add.text(W/2,308,'— DE FENOR —',{
+      fontFamily:'Share Tech Mono',fontSize:'15px',color:'#555555',letterSpacing:6
+    }).setOrigin(0.5);
+    this.add.text(W/2,355,'Cordura y extremidades no garantizadas.',{
+      fontFamily:'Share Tech Mono',fontSize:'13px',color:'#666666',align:'center'
+    }).setOrigin(0.5);
+    let btn=this.add.text(W/2,455,'[ INICIAR ]',{
+      fontFamily:'Share Tech Mono',fontSize:'21px',color:'#cc0000',stroke:'#000',strokeThickness:3
+    }).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerover',()=>{btn.setColor('#ff4444');btn.setScale(1.05);SFX.btnHover();});
+    btn.on('pointerout', ()=>{btn.setColor('#cc0000');btn.setScale(1);});
+    btn.on('pointerdown',()=>{SFX.btnClick();this._showNamePanel();});
+    this.tweens.add({targets:btn,alpha:{from:0.4,to:1},duration:800,yoyo:true,repeat:-1});
+  }
+  _showNamePanel(){
+    let row=document.getElementById('class-row');
+    row.innerHTML='';
+    let sel=PLAYER_CLASS.id;
+    CLASSES.forEach(cls=>{
+      let d=document.createElement('div');
+      d.className='class-btn'+(cls.id===sel?' selected':'');
+      d.innerHTML=`<div class="cls-name">${cls.name}</div><div class="cls-stats">${cls.stats}</div>`;
+      d.onclick=()=>{
+        PLAYER_CLASS=cls;
+        document.querySelectorAll('.class-btn').forEach(b=>b.classList.remove('selected'));
+        d.classList.add('selected');
+      };
+      row.appendChild(d);
+    });
+    document.getElementById('player-name-input').value='';
+    document.getElementById('name-panel').style.display='block';
+    let startBtn=document.getElementById('start-btn');
+    startBtn.onclick=null; // clear any previous handler
+    startBtn.onclick=()=>{
+      let name=document.getElementById('player-name-input').value.trim();
+      PLAYER_NAME=name||'DESCENDIENTE';
+      document.getElementById('name-panel').style.display='none';
+      STATE.reset();
+      SFX.gameStart();
+      this.cameras.main.fadeOut(400,0,0,0);
+      this.time.delayedCall(400,()=>this.scene.start('SceneMap'));
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE: MAP
+// ═══════════════════════════════════════════════════════════════
+class SceneMap extends Phaser.Scene {
+  constructor(){ super('SceneMap'); }
+  create(){
+    this.cameras.main.fadeIn(400,0,0,0);
+    this.add.rectangle(W/2,H/2,W,H,C.BLACK);
+
+    let lvl=STATE.level;
+    this._drawNodes(lvl);
+    this._drawStatus();
+    this._drawLog();
+
+    if(lvl>=7){ this._showChestScreen(); return; }
+
+    if(lvl===6){
+      this.add.text(W/2,310,'Las puertas tiemblan.\nAlgo antiguo respira al otro lado.',{
+        fontFamily:'Share Tech Mono',fontSize:'17px',color:'#aa0000',align:'center'
+      }).setOrigin(0.5);
+      let btn=this.add.text(W/2,420,'[ ENFRENTAR AL JEFE ]',{
+        fontFamily:'Share Tech Mono',fontSize:'20px',color:'#ff2222',
+        stroke:'#000',strokeThickness:2
+      }).setOrigin(0.5).setInteractive({useHandCursor:true});
+      btn.on('pointerover',()=>{btn.setColor('#ff6666');btn.setScale(1.04);SFX.btnHover();});
+      btn.on('pointerout', ()=>{btn.setColor('#ff2222');btn.setScale(1);});
+      btn.on('pointerdown',()=>{
+        SFX.sceneTransition();
+        this.cameras.main.fadeOut(300,0,0,0);
+        this.time.delayedCall(300,()=>this.scene.start('SceneBattle',{isBoss:true}));
+      });
+      this.tweens.add({targets:btn,alpha:{from:0.3,to:1},duration:600,yoyo:true,repeat:-1});
+      return;
+    }
+
+    let type=chance(45)?'battle':'event';
+    const battleDescs=[
+      'Se escuchan pasos entre las sombras...',
+      'Algo respira donde no debería haber nada.',
+      'El suelo cruje bajo un peso que no eres tú.',
+      'Un siseo rompe la oscuridad.',
+      'Oyes dientes. Muchos dientes.',
+      'Una sombra se mueve contra la corriente de luz.',
+      'Huele a sangre fresca. No es la tuya... todavía.',
+      'Algo te ha estado siguiendo desde el último nivel.',
+      'Las paredes sudan. El enemigo ya está aquí.',
+      'Escuchas tu propio nombre dicho en una voz equivocada.',
+    ];
+    const eventDescs=[
+      'Algo interrumpe el silencio...',
+      'El pasillo cambia. Esto no estaba aquí antes.',
+      'Encuentras algo que no debería existir en este lugar.',
+      'Una luz parpadeante revela lo que el descenso esconde.',
+      'El aire sabe diferente aquí. A decisiones.',
+      'Un símbolo grabado en la pared te observa.',
+      'Un sonido distante te llama. O te advierte.',
+      'El descenso te presenta una elección.',
+      'Algo yace en el suelo. No está muerto, solo espera.',
+      'Sientes que este momento importará más adelante.',
+    ];
+    let desc=type==='battle'?battleDescs[rnd(0,battleDescs.length-1)]:eventDescs[rnd(0,eventDescs.length-1)];
+    this.add.text(W/2,300,desc,{
+      fontFamily:'Share Tech Mono',fontSize:'16px',color:'#666666',align:'center'
+    }).setOrigin(0.5);
+
+    let btn=this.add.text(W/2,410,'[ AVANZAR ]',{
+      fontFamily:'Share Tech Mono',fontSize:'20px',color:'#cc0000',
+      stroke:'#000',strokeThickness:3
+    }).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerover',()=>{btn.setColor('#ff4444');btn.setScale(1.05);SFX.btnHover();});
+    btn.on('pointerout', ()=>{btn.setColor('#cc0000');btn.setScale(1);});
+    btn.on('pointerdown',()=>{
+      SFX.sceneTransition();
+      this.cameras.main.fadeOut(300,0,0,0);
+      this.time.delayedCall(300,()=>this.scene.start(type==='battle'?'SceneBattle':'SceneEvent', type==='battle'?{isBoss:false}:undefined));
+    });
+    this.tweens.add({targets:btn,alpha:{from:0.4,to:1},duration:800,yoyo:true,repeat:-1});
+  }
+
+  _nodeX(i){
+    const nodePositions=[95,195,295,395,495,595,700];
+    return nodePositions[i-1]||95;
+  }
+
+  _drawNodes(lvl){
+    // Separador horizontal bajo la franja
+    this.add.rectangle(W/2,36,W,1,0x220000,0.6);
+
+    const totalNodes=7;
+    const labels=['I','II','III','IV','V','JEFE','☽'];
+    const nodeY=24;
+    // Centered across full width with even spacing
+    const nodePositions=[100,200,300,400,500,610,710];
+
+    // Líneas de conexión
+    for(let i=0;i<totalNodes-1;i++){
+      let x1=nodePositions[i], x2=nodePositions[i+1];
+      let done=(i+1)<lvl;
+      this.add.rectangle((x1+x2)/2,nodeY,(x2-x1)-6,1,done?0x660000:0x1a1a1a,done?1:0.25);
+    }
+
+    // Nodos
+    for(let i=0;i<totalNodes;i++){
+      let nx=nodePositions[i], ny=nodeY;
+      let isPast=(i+1)<lvl, isCurrent=(i+1)===lvl;
+      let isBoss=i===5, isChest=i===6;
+      let r=isBoss||isChest?11:8;
+
+      let nodeColor=isPast?0x330000:isCurrent?0xcc0000:0x0d0d0d;
+      let borderColor=isPast?0x660000:isCurrent?0xff2222:0x1a1a1a;
+
+      this.add.circle(nx,ny,r+1,0x000000);
+      let circle=this.add.circle(nx,ny,r,nodeColor);
+      circle.setStrokeStyle(isCurrent?2:1,borderColor,isCurrent?1:isPast?0.8:0.2);
+
+      if(isCurrent){
+        this.tweens.add({targets:circle,scaleX:{from:1,to:1.18},scaleY:{from:1,to:1.18},duration:750,yoyo:true,repeat:-1,ease:'Sine.easeInOut'});
+      }
+
+      let labelCol=isPast?'#441111':isCurrent?'#ff3333':'#181818';
+      this.add.text(nx,ny,labels[i],{fontFamily:'Share Tech Mono',fontSize:'7px',color:labelCol}).setOrigin(0.5);
+    }
+  }
+
+  _drawStatus(){
+    let p=STATE.parts;
+    let sanCol=sanColor(STATE.sanity);
+    // Background panel — mismo tamaño original
+    this.add.rectangle(W/2, 96, W-20, 100, 0x080808, 0.92).setStrokeStyle(1, 0x220000, 0.6);
+
+    // ── Nombre y clase — posición original ──────────────────────────
+    this.add.text(18, 52, PLAYER_NAME, {fontFamily:'Share Tech Mono',fontSize:'15px',color:'#33cc33'}).setOrigin(0,0);
+    this.add.text(18, 70, `[ ${PLAYER_CLASS.name} ]`, {fontFamily:'Share Tech Mono',fontSize:'10px',color:'#446622'}).setOrigin(0,0);
+
+    // ── MENTE — posición original ────────────────────────────────────
+    this.add.text(310, 52, 'MENTE', {fontFamily:'Share Tech Mono',fontSize:'9px',color:'#444'}).setOrigin(0.5,0);
+    this.add.text(310, 64, `${STATE.sanity}`, {fontFamily:'Share Tech Mono',fontSize:'18px',color:sanCol,stroke:'#000',strokeThickness:1}).setOrigin(0.5,0);
+
+    // ── ORO — posición original ──────────────────────────────────────
+    this.add.text(450, 52, 'ORO', {fontFamily:'Share Tech Mono',fontSize:'9px',color:'#444'}).setOrigin(0.5,0);
+    this.add.text(450, 64, `${STATE.gold}`, {fontFamily:'Share Tech Mono',fontSize:'18px',color:'#bbaa00'}).setOrigin(0.5,0);
+
+    // ── Separadores verticales originales ────────────────────────────
+    this.add.rectangle(270, 75, 1, 44, 0x220000, 0.5);
+    this.add.rectangle(400, 75, 1, 44, 0x220000, 0.5);
+
+    // ── Partes del cuerpo — posición original ───────────────────────
+    let partLabels=['CAB','TORSO','B.IZQ','B.DER','P.IZQ','P.DER'];
+    let partKeys=['head','torso','armL','armR','legL','legR'];
+    let startX=530, colW=46;
+    partKeys.forEach((k,i)=>{
+      let pp=p[k];
+      let val=pp.severed?'✗':`${pp.cur}`;
+      let col=pp.severed?'#550000':this._partColor(pp.cur,pp.max);
+      let xp=startX+i*colW;
+      this.add.text(xp, 52, partLabels[i], {fontFamily:'Share Tech Mono',fontSize:'8px',color:'#445544'}).setOrigin(0.5,0);
+      this.add.text(xp, 64, val, {fontFamily:'Share Tech Mono',fontSize:'16px',color:col,stroke:'#000',strokeThickness:1}).setOrigin(0.5,0);
+      this.add.text(xp, 82, `/${pp.max}`, {fontFamily:'Share Tech Mono',fontSize:'8px',color:'#333'}).setOrigin(0.5,0);
+    });
+
+    // ── PREC · EVA · DMG — fila inferior bajo nombre/clase ──────────
+    let pen=STATE.getLimbPenalties();
+    let precPenMap=pen.accLimb+(pen.accSan||0);
+    let evaPenMap=pen.eva;
+    let precValMap=Math.max(0,100-precPenMap);
+    let evaValMap=Math.max(0,100-evaPenMap);
+    let dmgPenMap=STATE.getTotalDmgPenalty();
+    let dmgMinMap=Math.max(1,8+STATE.buffs.damage-dmgPenMap);
+    let dmgMaxMap=Math.max(1,18+STATE.buffs.damage-dmgPenMap);
+    let precColMap=precValMap===100?'#22aa22':precValMap>=70?'#aaaa00':'#cc0000';
+    let evaColMap=evaValMap===100?'#22aa22':evaValMap>=70?'#aaaa00':'#cc0000';
+    let dmgColMap=dmgPenMap===0?'#22aa22':dmgPenMap<5?'#aaaa00':'#cc0000';
+    this.add.text(18,  84, 'PREC', {fontFamily:'Share Tech Mono',fontSize:'9px',color:'#555'}).setOrigin(0,0);
+    this.add.text(55,  84, `${precValMap}%`, {fontFamily:'Share Tech Mono',fontSize:'13px',color:precColMap,stroke:'#000',strokeThickness:1}).setOrigin(0,0);
+    this.add.text(105, 84, 'EVA',  {fontFamily:'Share Tech Mono',fontSize:'9px',color:'#555'}).setOrigin(0,0);
+    this.add.text(137, 84, `${evaValMap}%`,  {fontFamily:'Share Tech Mono',fontSize:'13px',color:evaColMap,stroke:'#000',strokeThickness:1}).setOrigin(0,0);
+    this.add.text(185, 84, 'DMG',  {fontFamily:'Share Tech Mono',fontSize:'9px',color:'#555'}).setOrigin(0,0);
+    this.add.text(215, 84, `${dmgMinMap}~${dmgMaxMap}`, {fontFamily:'Share Tech Mono',fontSize:'13px',color:dmgColMap,stroke:'#000',strokeThickness:1}).setOrigin(0,0);
+  }
+  _partColor(cur,max){
+    if(!max) return '#444';
+    let pct=cur/max;
+    return pct>0.6?'#22aa22':pct>0.3?'#aaaa00':'#cc0000';
+  }
+  _drawLog(){
+    // Large log panel at bottom like combat
+    this.add.rectangle(W/2, 552, W-20, 88, 0x060606, 0.97).setStrokeStyle(1, 0x1a1a1a, 0.6);
+    this.add.text(18, 511, '// TERMINAL:', {fontFamily:'Share Tech Mono',fontSize:'10px',color:'#333'});
+    STATE.log.slice(0,5).forEach((l,i)=>
+      this.add.text(18, 523+i*18, '> '+l.slice(0,98), {fontFamily:'Share Tech Mono',fontSize:'11px',color:i===0?'#446644':'#2a2a2a'}).setOrigin(0,0)
+    );
+  }
+  _showChestScreen(){
+    let ov=document.getElementById('chest-overlay');
+    let content=document.getElementById('chest-content');
+    let openBtn=document.getElementById('chest-open-btn');
+    let restartBtn=document.getElementById('chest-restart-btn');
+    let art=document.getElementById('chest-art');
+    ov.style.display='flex';
+    art.textContent='🪦';
+    content.innerHTML='<p style="color:#555;font-size:13px">Has sobrevivido al descenso.<br>El cofre espera.</p>';
+    openBtn.style.display='inline-block';
+    restartBtn.style.display='none';
+    openBtn.onclick=()=>{ SFX.chestOpen();
+      let loot=rollLoot();
+      openBtn.style.display='none';
+      art.textContent=loot.icon;
+      if(loot.empty){
+        content.innerHTML=`
+          <div class="loot-box">
+            <div class="loot-item" style="color:#444">[ COFRE VACÍO ]</div>
+            <div style="color:#333;font-size:12px;margin-top:8px">¿Valió la pena todo esto?</div>
+            <div style="color:#222;font-size:11px;margin-top:4px">Siete niveles. Todas tus extremidades. Tu cordura.<br>Por nada.</div>
+          </div>`;
+      } else {
+        content.innerHTML=`<div class="loot-box"><div class="loot-item" style="color:${loot.color}">★ ${loot.prize} ★</div></div>`;
+      }
+      restartBtn.style.display='inline-block';
+      restartBtn.onclick=()=>{ ov.style.display='none'; STATE.reset(); location.reload(); };
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EVENTS
+// ═══════════════════════════════════════════════════════════════
+const EVENTS = [
+  {
+    title:'ALTAR DE HUESO',
+    desc:'Un altar construido con costillas humanas.\nAlgo palpita en su centro.',
+    choices:[
+      { label:'REZAR',
+        fn:()=>{
+          if(chance(40)){
+            let msgs=STATE.healDistribute(30);
+            return {msg:`El altar responde. +30 curación repartida. ${msgs.join(', ')}`,color:'#00cc66'};
+          }
+          STATE.sanity-=20; clampSanity();
+          return {msg:'El altar no acepta tus plegarias. Te devuelve algo peor. -20 CORDURA.',color:'#cc0000'};
+        }
+      },
+      { label:'DESTRUIRLO',
+        fn:()=>{
+          let dmg=rnd(10,20);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          if(chance(35)){ STATE.buffs.damage+=8; return {msg:`Lo destruyes. Los fragmentos te cortan. -${dmg} TORSO. +8 Daño permanente.`,color:'#884400',shake:true}; }
+          return {msg:`Lo destruyes. El dolor vale la pena. -${dmg} TORSO.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'Lo rodeas. Los huesos te siguen con las cuencas.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'COFRE ENCADENADO',
+    desc:'Tres cadenas. Dos candados. Un cofre.\nUno de los candados ya está abierto.',
+    choices:[
+      { label:'ABRIRLO',
+        fn:()=>{
+          let roll=rnd(1,4);
+          if(roll===1){
+            let g=rnd(20,40); STATE.gold+=g;
+            return {msg:`Monedas y un diente. +${g} Oro.`,color:'#aaaa00'};
+          } else if(roll===2){
+            let dmg=rnd(15,25);
+            STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+            return {msg:`Trampa de pinchos. Siete clavos en el torso. -${dmg} TORSO.`,color:'#cc4400',shake:true};
+          } else if(roll===3){
+            STATE.buffs.evasion+=15;
+            return {msg:'Botas de cuero de criatura sin nombre. +15% Evasión permanente.',color:'#00aa88'};
+          } else {
+            if(chance(50)){ STATE.buffs.damage+=8; return {msg:'Diente de algo grande. +8 Daño permanente.',color:'#aaaa00'}; }
+            let msgs=STATE.healDistribute(15);
+            return {msg:`Corazón de Piedra. Curación distribuida. ${msgs.join(', ')}`,color:'#00cc66'};
+          }
+        }
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'Sabio. Sigues adelante. El cofre te mira marcharte.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'POZO SIN FONDO',
+    desc:'Un pozo que se niega a tener fondo.\nAlgo brilla muy abajo. O te llama.',
+    choices:[
+      { label:'BAJAR',
+        fn:()=>{
+          if(chance(50)){
+            let g=rnd(20,50); STATE.gold+=g;
+            return {msg:`Monedas de un reino que ya no existe. +${g} Oro.`,color:'#aaaa00'};
+          } else {
+            let dmg=rnd(15,25);
+            STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+            if(chance(30)){
+              let legs=['legL','legR'].filter(k=>!STATE.parts[k].severed);
+              if(legs.length){ let k=legs[rnd(0,legs.length-1)];
+                STATE.parts[k].severed=true; STATE.parts[k].cur=0;
+                return {msg:`Caes. ${partName(k)} se quiebra al impactar. -${dmg} TORSO. ¡PIERNA PERDIDA!`,color:'#ff0000',shake:true}; }
+            }
+            return {msg:`Caes. El fondo existe después de todo. -${dmg} TORSO.`,color:'#cc0000',shake:true};
+          }
+        }
+      },
+      { label:'LANZAR UNA PIEDRA',
+        fn:()=>({msg:'Cae durante veinte segundos. Luego silencio. Luego más silencio.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'ESPEJO ROTO',
+    desc:'Tu reflejo no imita tus movimientos.\nSonríe cuando tú no lo haces.',
+    choices:[
+      { label:'ROMPERLO',
+        fn:()=>{
+          let dmg=rnd(8,15);
+          let arm=chance(50)?'armL':'armR';
+          STATE.parts[arm].cur=Math.max(0,STATE.parts[arm].cur-dmg);
+          if(chance(40)){ STATE.buffs.damage+=10;
+            return {msg:`Tu mano sangra. -${dmg} ${partName(arm)}. +10 Daño permanente.`,color:'#884400',shake:true}; }
+          STATE.sanity-=15; clampSanity();
+          return {msg:`Rompes el espejo. La imagen sonríe mientras cae. -${dmg} ${partName(arm)}. -15 CORDURA.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'MIRARLO',
+        fn:()=>{
+          if(chance(50)){
+            STATE.buffs.evasion+=12;
+            return {msg:'Estudias al otro tú. Aprendes a moverte como él. +12% Evasión.',color:'#00aa88'};
+          }
+          STATE.sanity-=22; clampSanity();
+          return {msg:'Ves algo detrás de tu reflejo. No te lo sacas de la cabeza. -22 CORDURA.',color:'#cc0000'};
+        }
+      },
+    ]
+  },
+  {
+    title:'CUERPO COLGADO',
+    desc:'Un cuerpo cuelga del techo. Lleva tus ropas.\nTiene tu cara.',
+    choices:[
+      { label:'REGISTRARLO',
+        fn:()=>{
+          let g=rnd(10,25); STATE.gold+=g;
+          if(chance(35)){ STATE.sanity-=20; clampSanity();
+            return {msg:`Encuentras monedas. +${g} Oro. Pero una de sus manos se mueve. -20 CORDURA.`,color:'#884400'}; }
+          return {msg:`Encuentras monedas en los bolsillos del cadáver. +${g} Oro.`,color:'#aaaa00'};
+        }
+      },
+      { label:'CORTARLO',
+        fn:()=>{
+          if(chance(45)){
+            let msgs=STATE.healDistribute(20);
+            return {msg:`Al caer libera algo. +20 curación. ${msgs.join(', ')}`,color:'#00cc00'};
+          }
+          let dmg=rnd(10,18);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          return {msg:`Al caer, se aferra a ti. Sus manos son frías. -${dmg} TORSO.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'Sigues adelante. No es la primera copia que ves.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'CHARCO BRILLANTE',
+    desc:'El suelo brilla bajo tus pies.\nEl líquido pulsa como un corazón.',
+    choices:[
+      { label:'BEBERLO',
+        fn:()=>{
+          let roll=rnd(1,3);
+          if(roll===1){
+            let msgs=STATE.healDistribute(30);
+            return {msg:`Sabe a nada. Te cura. ${msgs.join(', ')}`,color:'#00cc00'};
+          }
+          if(roll===2){ STATE.sanity-=30; clampSanity();
+            return {msg:'El líquido habla. Lo oyes aunque no tiene boca. -30 CORDURA.',color:'#cc0000'}; }
+          // Heal ALL parts to max
+          Object.values(STATE.parts).forEach(p=>{ if(!p.severed) p.cur=p.max; });
+          return {msg:'Tu corazón late más fuerte. Todo tu cuerpo restaurado.',color:'#00cc66'};
+        }
+      },
+      { label:'TOCARLO',
+        fn:()=>{
+          if(chance(55)){
+            STATE.buffs.damage+=5;
+            return {msg:'Algo de la oscuridad pasa a ti. +5 Daño permanente.',color:'#aaaa00'};
+          }
+          let dmg=rnd(8,16);
+          let arm=chance(50)?'armL':'armR';
+          STATE.parts[arm].cur=Math.max(0,STATE.parts[arm].cur-dmg);
+          return {msg:`El charco quema. -${dmg} ${partName(arm)}.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'Rodeas el charco. Algo bajo el líquido te sigue con los ojos.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'CAMPANA ROTA',
+    desc:'Una campana del tamaño de una persona.\nSin badajo. Suena igual.',
+    choices:[
+      { label:'ENTRAR',
+        fn:()=>{
+          if(chance(45)){
+            STATE.buffs.evasion+=18; STATE.buffs.damage+=6;
+            return {msg:'El sonido te resuena por dentro. +18% Evasión. +6 Daño permanente.',color:'#00aa88'};
+          }
+          let dmg=rnd(12,22);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          STATE.sanity-=20; clampSanity();
+          return {msg:`El sonido te destroza los tímpanos. -${dmg} CABEZA. -20 CORDURA.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'GOLPEARLA',
+        fn:()=>{
+          STATE.sanity-=12; clampSanity();
+          let g=rnd(5,18); STATE.gold+=g;
+          return {msg:`El sonido trae ecos de algo muerto. -12 CORDURA. +${g} Oro.`,color:'#884400'};
+        }
+      },
+    ]
+  },
+  {
+    title:'NIÑO SIN SOMBRA',
+    desc:'Un niño en el pasillo. No tiene sombra.\nTe mira fijamente desde hace varios minutos.',
+    choices:[
+      { label:'HABLARLE',
+        fn:()=>{
+          if(chance(50)){
+            let msgs=STATE.healDistribute(25);
+            return {msg:`Sonríe y desaparece. Encuentras comida. ${msgs.join(', ')}`,color:'#00cc00'};
+          }
+          STATE.sanity-=35; clampSanity();
+          return {msg:'Abre la boca. No tiene lengua. Ríe sin sonido durante mucho tiempo. -35 CORDURA.',color:'#cc0000'};
+        }
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'Sigues caminando. Cuando miras atrás, ya no está. Tu sombra tampoco.',color:'#888888'})
+      },
+      { label:'ATACARLO',
+        fn:()=>{
+          STATE.sanity-=40; clampSanity();
+          let dmg=rnd(15,28);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          return {msg:`No era un niño. Era muchos. Todos gritan a la vez. -${dmg} TORSO. -40 CORDURA.`,color:'#ff0000',shake:true};
+        }
+      },
+    ]
+  },
+  {
+    title:'ESTATUA QUE LLORA',
+    desc:'Una estatua de piedra con el rostro cubierto.\nEl líquido que cae de sus ojos es negro.',
+    choices:[
+      { label:'BEBER LAS LÁGRIMAS',
+        fn:()=>{
+          if(chance(50)){
+            STATE.sanity=Math.min(100,STATE.sanity+25);
+            return {msg:'Las lágrimas saben a agua limpia. La oscuridad retrocede. +25 CORDURA.',color:'#22aa22'};
+          }
+          STATE.sanity-=25; clampSanity();
+          let dmg=rnd(8,16);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          return {msg:`Envenenado. -${dmg} CABEZA. -25 CORDURA.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'ROMPERLA',
+        fn:()=>{
+          let g=rnd(10,25); STATE.gold+=g;
+          STATE.sanity-=10; clampSanity();
+          return {msg:`Cae al suelo. Dentro había monedas. +${g} Oro. -10 CORDURA.`,color:'#884400'};
+        }
+      },
+    ]
+  },
+  {
+    title:'MERCADER SIN OJOS',
+    desc:'Un hombre sin cuencas te ofrece mercancía.\nNo ves el precio hasta que pagas.',
+    choices:[
+      { label:'COMPRAR (10 ORO)',
+        fn:()=>{
+          if(STATE.gold<10) return {msg:'No tienes suficiente. El mercader no parece sorprendido.',color:'#888888'};
+          STATE.gold-=10;
+          let roll=rnd(1,4);
+          if(roll===1){
+            let msgs=STATE.healDistribute(25);
+            return {msg:`Compras una raíz. Curación distribuida. ${msgs.join(', ')}`,color:'#00cc66'};
+          }
+          if(roll===2){ STATE.buffs.damage+=10; return {msg:'Compras un guante de hierro negro. +10 Daño permanente.',color:'#aaaa00'}; }
+          if(roll===3){ STATE.buffs.evasion+=20; return {msg:'Compras botas silenciosas. +20% Evasión permanente.',color:'#00aa88'}; }
+          // Restore a severed limb
+          let severed=Object.entries(STATE.parts).filter(([k,p])=>p.severed&&k!=='head'&&k!=='torso');
+          if(severed.length){ let [k,p]=severed[rnd(0,severed.length-1)];
+            p.severed=false; p.cur=Math.ceil(p.max*0.5);
+            return {msg:`Compras algo envuelto en trapos. Era tu ${partName(k)}.`,color:'#00cc00'}; }
+          let msgs=STATE.healDistribute(30);
+          return {msg:`Compras algo que no entiendes. Te sana. ${msgs.join(', ')}`,color:'#00cc00'};
+        }
+      },
+      { label:'ROBARLE',
+        fn:()=>{
+          if(chance(40)){
+            let g=rnd(15,35); STATE.gold+=g;
+            return {msg:`Toma lo que puede. +${g} Oro. El mercader no dice nada.`,color:'#aaaa00'};
+          }
+          let dmg=rnd(12,22);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          let alive=Object.entries(STATE.parts).filter(([k,p])=>!p.severed&&k!=='torso'&&k!=='head');
+          if(alive.length&&chance(40)){
+            let [lmb,p]=alive[rnd(0,alive.length-1)];
+            p.severed=true; p.cur=0;
+            return {msg:`El mercader "sin ojos" ve perfectamente. Toma tu ${partName(lmb)}. -${dmg} TORSO.`,color:'#ff0000',shake:true};
+          }
+          return {msg:`El mercader "sin ojos" ve perfectamente. -${dmg} TORSO.`,color:'#cc0000',shake:true};
+        }
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'Sigues. El mercader te dice el precio de todo mientras te marchas.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'PILETA DE SANGRE',
+    desc:'Una pileta llena de sangre negra.\nHuele a metal y a algo dulce.',
+    choices:[
+      { label:'SUMERGIRTE COMPLETO',
+        fn:()=>{
+          let roll=rnd(1,3);
+          if(roll===1){
+            // Restore all severed limbs and full heal
+            let restored=[];
+            Object.entries(STATE.parts).forEach(([k,p])=>{
+              if(p.severed&&k!=='head'&&k!=='torso'){ p.severed=false; p.cur=p.max; restored.push(partName(k)); }
+              else if(!p.severed){ p.cur=p.max; }
+            });
+            return {msg:`La sangre te restaura. Todo curado${restored.length?'. Recuperas: '+restored.join(', '):''}`,color:'#00ff88'};
+          }
+          if(roll===2){
+            let alive=Object.entries(STATE.parts).filter(([k,p])=>!p.severed&&k!=='torso'&&k!=='head');
+            let dmg=rnd(15,28);
+            STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+            if(alive.length){ let [lmb,p]=alive[rnd(0,alive.length-1)];
+              p.severed=true; p.cur=0;
+              return {msg:`La sangre disuelve tu ${partName(lmb)}. -${dmg} TORSO. ¡EXTREMIDAD PERDIDA!`,color:'#ff0000',shake:true}; }
+            return {msg:`La sangre te quema. -${dmg} TORSO.`,color:'#ff0000',shake:true};
+          }
+          STATE.buffs.damage+=15;
+          let msgs=STATE.healDistribute(15);
+          return {msg:`La sangre te empapa de fuerza. +15 Daño permanente. ${msgs.join(', ')}`,color:'#cc4400'};
+        }
+      },
+      { label:'METER SOLO LA MANO',
+        fn:()=>{
+          if(chance(60)){
+            let msgs=STATE.healDistribute(15);
+            return {msg:`Algo frío y agradable. ${msgs.join(', ')}`,color:'#00cc00'};
+          }
+          let lmb=chance(50)?'armL':'armR';
+          if(!STATE.parts[lmb].severed){
+            STATE.parts[lmb].severed=true; STATE.parts[lmb].cur=0;
+            return {msg:`Algo tira de tu ${partName(lmb)} hacia el fondo. No la sueltan.`,color:'#ff0000',shake:true};
+          }
+          let dmg=rnd(8,16);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          return {msg:`Algo quema. -${dmg} TORSO.`,color:'#cc4400',shake:true};
+        }
+      },
+      { label:'NO TOCARLA',
+        fn:()=>({msg:'Te alejas. La pileta susurra que volverás.',color:'#888888'})
+      },
+    ]
+  },
+  {
+    title:'LIBRO ENCADENADO',
+    desc:'Encadenado a la pared, abierto en una página en blanco.\nLas cadenas son necesarias, dice la nota al pie.',
+    choices:[
+      { label:'LEER TODO',
+        fn:()=>{
+          if(chance(30)){ STATE.buffs.damage+=12; STATE.buffs.evasion+=8;
+            return {msg:'Lo lees. Cada página toma algo. +12 Daño. +8% Evasión.',color:'#aaaa00'}; }
+          STATE.sanity=Math.max(0,STATE.sanity-45); clampSanity();
+          return {msg:'El libro te lee a ti. -45 CORDURA.',color:'#cc0000'};
+        }
+      },
+      { label:'LEER SOLO LA PRIMERA PÁGINA',
+        fn:()=>{
+          if(chance(50)){ STATE.buffs.damage+=6; return {msg:'La primera página te enseña a matar mejor. +6 Daño permanente.',color:'#aaaa00'}; }
+          STATE.sanity-=20; clampSanity();
+          return {msg:'La primera página te enseña que no debiste haberla leído. -20 CORDURA.',color:'#cc0000'};
+        }
+      },
+      { label:'QUEMARLO',
+        fn:()=>{
+          let dmg=rnd(5,10);
+          STATE.parts.armL.cur=Math.max(0,STATE.parts.armL.cur-dmg);
+          STATE.gold+=rnd(15,30);
+          return {msg:`Al quemarlo escupes monedas. -${dmg} Brazo Izq. por las llamas. +Oro.`,color:'#884400'};
+        }
+      },
+    ]
+  },
+  {
+    title:'MÚSICA SIN FUENTE',
+    desc:'Una melodía que no debería existir aquí.\nSe vuelve más clara si cierras los ojos.',
+    choices:[
+      { label:'ESCUCHARLA',
+        fn:()=>{
+          if(chance(55)){
+            STATE.sanity=Math.min(100,STATE.sanity+20);
+            let msgs=STATE.healDistribute(20);
+            return {msg:`La música te recuerda algo anterior. +20 CORDURA. ${msgs.join(', ')}`,color:'#22aa22'};
+          }
+          STATE.sanity-=30; clampSanity();
+          return {msg:'La música cambia. Ahora habla. Dice tu nombre. -30 CORDURA.',color:'#cc0000'};
+        }
+      },
+      { label:'TAPARTE LOS OÍDOS',
+        fn:()=>({msg:'La tapas con las manos. Sigues oyéndola de todas formas.',color:'#888888'})
+      },
+    ]
+  },
+  // ── DADO EVENT ──────────────────────────────────────────────────
+  {
+    title:'ALTAR DEL DADO',
+    desc:'Un altar con un dado de piedra del tamaño de un puño.\nUna inscripción dice: "El azar es el único dios aquí."',
+    isDiceEvent: true,
+    choices:[
+      { label:'LANZAR EL DADO',
+        fn:()=>null // handled by SceneEvent specially
+      },
+      { label:'IGNORARLO',
+        fn:()=>({msg:'El dado rueda solo mientras te marchas. Se detiene en 1.',color:'#888888'})
+      },
+    ]
+  },
+];
+
+// ─── DICE EVENT RESULTS ─────────────────────────────────────────
+const DICE_RESULTS = [
+  { face:1, msg:'MALDICIÓN. Pierdes ambos brazos.',    color:'#ff0000', shake:true,
+    fn:()=>{
+      let msgs=[];
+      ['armL','armR'].forEach(k=>{ if(!STATE.parts[k].severed){ STATE.parts[k].severed=true; STATE.parts[k].cur=0; msgs.push(partName(k)); }});
+      return msgs.length?`¡PIERDES ${msgs.join(' Y ')}!`:'Tus brazos ya no existían. La maldición ríe igual.';
+    }
+  },
+  { face:2, msg:'TORMENTO. Tu mente se fractura.',     color:'#aa00aa', shake:true,
+    fn:()=>{ STATE.sanity=Math.max(0,STATE.sanity-40); clampSanity(); return '-40 CORDURA.'; }
+  },
+  { face:3, msg:'HERIDA. Daño al torso y a una pierna.', color:'#cc4400', shake:true,
+    fn:()=>{
+      let dmgT=rnd(15,25), dmgL=rnd(8,14);
+      STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmgT);
+      let leg=chance(50)?'legL':'legR';
+      STATE.parts[leg].cur=Math.max(0,STATE.parts[leg].cur-dmgL);
+      return `-${dmgT} TORSO, -${dmgL} ${partName(leg)}.`;
+    }
+  },
+  { face:4, msg:'FORTUNA MODERADA. El dado te favorece a medias.', color:'#888800', shake:false,
+    fn:()=>{
+      let msgs=STATE.healDistribute(30);
+      STATE.gold+=rnd(10,20);
+      return `Curación distribuida. ${msgs.join(', ')}. +Oro.`;
+    }
+  },
+  { face:5, msg:'PODER. Tu daño aumenta permanentemente.', color:'#00aa88', shake:false,
+    fn:()=>{ STATE.buffs.damage+=10; STATE.buffs.evasion+=8; return '+10 Daño permanente. +8% Evasión.'; }
+  },
+  { face:6, msg:'GRACIA TOTAL. El dado te restaura.', color:'#00ff88', shake:false,
+    fn:()=>{
+      let restored=[];
+      Object.entries(STATE.parts).forEach(([k,p])=>{
+        if(p.severed&&k!=='head'&&k!=='torso'){ p.severed=false; p.cur=p.max; restored.push(partName(k)); }
+        else if(!p.severed){ p.cur=p.max; }
+      });
+      STATE.sanity=Math.min(100,STATE.sanity+30);
+      return `Todo curado. ${restored.length?'Recuperas: '+restored.join(', ')+'. ':''} +30 CORDURA.`;
+    }
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE: EVENT
+// ═══════════════════════════════════════════════════════════════
+class SceneEvent extends Phaser.Scene {
+  constructor(){ super('SceneEvent'); }
+  create(){
+    this.cameras.main.fadeIn(400,0,0,0);
+    this.add.rectangle(W/2,H/2,W,H,C.BLACK);
+    for(let i=0;i<28;i++) this.add.rectangle(rnd(0,W),rnd(0,H),rnd(1,3),rnd(20,100),C.RED,rnd(1,8)/100);
+
+    let ev=EVENTS[rnd(0,EVENTS.length-1)];
+    this.resolved=false;
+    this._ev=ev;
+
+    let sanCol=sanColor(STATE.sanity);
+    let sanWarn=STATE.sanity<50?' ⚠':'';
+    this.add.text(W-15,10,`SAN ${STATE.sanity}${sanWarn}`,{fontFamily:'Share Tech Mono',fontSize:'12px',color:sanCol}).setOrigin(1,0);
+
+    let p=STATE.parts;
+    this.add.text(W-15,24,`CAB ${p.head.cur}/${p.head.max} TRS ${p.torso.cur}/${p.torso.max}  ORO ${STATE.gold}`,{fontFamily:'Share Tech Mono',fontSize:'10px',color:'#555'}).setOrigin(1,0);
+
+    this.add.text(W/2,85,ev.title,{
+      fontFamily:'Cinzel Decorative',fontSize:'34px',color:'#cc0000',
+      stroke:'#000',strokeThickness:4,shadow:{color:'#ff0000',blur:18,fill:true},align:'center'
+    }).setOrigin(0.5);
+    this.add.text(W/2,175,ev.desc,{
+      fontFamily:'Share Tech Mono',fontSize:'15px',color:'#666666',align:'center',wordWrap:{width:620}
+    }).setOrigin(0.5);
+
+    this.resultText=this.add.text(W/2,400,'',{
+      fontFamily:'Share Tech Mono',fontSize:'14px',color:'#ffffff',align:'center',wordWrap:{width:680}
+    }).setOrigin(0.5);
+
+    // Choices: create all buttons first, then reposition based on actual widths
+    let numChoices=ev.choices.length;
+    let btnY=295;
+    let padding=32; // space between buttons
+    // Create all buttons at x=0 first so we can measure their real widths
+    this.btns=ev.choices.map((ch,i)=>{
+      let btn=this.add.text(0,btnY,`[ ${ch.label} ]`,{
+        fontFamily:'Share Tech Mono',fontSize:'15px',color:'#cc0000',
+        stroke:'#000',strokeThickness:2
+      }).setOrigin(0.5).setInteractive({useHandCursor:true});
+      btn.on('pointerover',()=>{btn.setColor('#ff4444');btn.setScale(1.04);});
+      btn.on('pointerout', ()=>{btn.setColor('#cc0000');btn.setScale(1);});
+      btn.on('pointerdown',()=>{
+        if(this.resolved) return;
+        SFX.eventChoice();
+        if(ev.isDiceEvent && ch.label==='LANZAR EL DADO'){
+          this._diceRoll();
+        } else {
+          this._resolve(ch.fn());
+        }
+      });
+      return btn;
+    });
+    // Now measure total width and distribute evenly with consistent gaps
+    let totalW=this.btns.reduce((s,b)=>s+b.width,0)+(numChoices-1)*padding;
+    let curX=W/2 - totalW/2;
+    this.btns.forEach(b=>{ curX+=b.width/2; b.setX(curX); curX+=b.width/2+padding; });
+
+    this.nextBtn=this.add.text(W/2,510,'[ CONTINUAR ]',{fontFamily:'Share Tech Mono',fontSize:'18px',color:'#444444'}).setOrigin(0.5);
+  }
+
+  _diceRoll(){
+    if(this.resolved) return;
+    this.resolved=true;
+    SFX.diceRoll();
+    this.btns.forEach(b=>b.setActive(false).setVisible(false));
+
+    // Animate dice
+    let diceTxt=this.add.text(W/2,340,'?',{
+      fontFamily:'Cinzel Decorative',fontSize:'80px',color:'#cc0000',
+      stroke:'#000',strokeThickness:5,shadow:{color:'#ff0000',blur:30,fill:true}
+    }).setOrigin(0.5);
+
+    let count=0, maxRolls=20;
+    let interval=setInterval(()=>{
+      diceTxt.setText(String(rnd(1,6)));
+      count++;
+      if(count>=maxRolls){
+        clearInterval(interval);
+        let result=DICE_RESULTS[rnd(0,5)];
+        diceTxt.setText(String(result.face)).setColor(result.color);
+        this.cameras.main.flash(400,80,0,0);
+        if(result.shake) this.cameras.main.shake(500,0.03);
+        let extra=result.fn();
+        this.time.delayedCall(600,()=>{
+          SFX.diceResult(!result.bad);
+          this._resolve({msg:`[ ${result.face} ] — ${result.msg}\n${extra}`, color:result.color, shake:result.shake});
+        });
+      }
+    }, 80);
+  }
+
+  _resolve(result){ if(result && result.color){ if(['#22aa22','#00cc88','#44ff44','#ffcc00','#aaffaa'].includes(result.color)) SFX.eventGood(); else SFX.eventBad(); }
+    if(!result) return;
+    this.resolved=true;
+    this.btns.forEach(b=>b.setActive(false).setVisible(false));
+    this.resultText.setText(result.msg).setColor(result.color||'#ffffff');
+    STATE.addLog(`[NV${STATE.level}] ${result.msg}`);
+    if(result.shake) this.cameras.main.shake(500,0.025);
+
+    if(STATE.sanity<=0){
+      STATE.deathCause='insanity';
+      this.time.delayedCall(2200,()=>{ this.cameras.main.fadeOut(600,0,0,0);
+        this.time.delayedCall(600,()=>this.scene.start('SceneInsanity')); });
+      return;
+    }
+    if(!STATE.isAlive()){
+      // Allow coin flip before game over, same as combat
+      if(!STATE.coinUsed){
+        STATE.coinUsed=true;
+        this.cameras.main.shake(600,0.04); this.cameras.main.flash(800,150,0,0);
+        this.time.delayedCall(900,()=>{
+          let dimmer=this.add.rectangle(W/2,H/2,W,H,0x000000,0).setDepth(30);
+          this.tweens.add({targets:dimmer,alpha:0.82,duration:500});
+          let title=this.add.text(W/2,200,'— LLEGAS A LAS PUERTAS —',{
+            fontFamily:'Cinzel Decorative',fontSize:'22px',color:'#cc0000',
+            stroke:'#000',strokeThickness:4
+          }).setOrigin(0.5).setDepth(32).setAlpha(0);
+          this.tweens.add({targets:title,alpha:1,duration:600,delay:300});
+          let sub=this.add.text(W/2,260,'El evento te mató.\nTodavía tienes una moneda.',{
+            fontFamily:'Share Tech Mono',fontSize:'14px',color:'#888888',align:'center'
+          }).setOrigin(0.5).setDepth(32).setAlpha(0);
+          this.tweens.add({targets:sub,alpha:1,duration:600,delay:500});
+          let coinBtn=this.add.text(W/2,320,'[ ☽  LANZAR LA ÚLTIMA MONEDA  ☽ ]',{
+            fontFamily:'Share Tech Mono',fontSize:'16px',color:'#ffaa00',
+            backgroundColor:'#1a0800',padding:{x:14,y:9}
+          }).setOrigin(0.5).setDepth(32).setAlpha(0).setInteractive({useHandCursor:true});
+          this.tweens.add({targets:coinBtn,alpha:{from:0.3,to:1},duration:500,yoyo:true,repeat:-1,delay:700});
+          coinBtn.on('pointerdown',()=>{
+            this.tweens.killTweensOf(coinBtn);
+            dimmer.destroy(); title.destroy(); sub.destroy(); coinBtn.destroy();
+            if(Math.random()<0.5){
+              let msgs=STATE.healDistribute(40);
+              this.cameras.main.flash(700,0,80,0);
+              this.resultText.setText(`CARA — La muerte te escupe. ${msgs.join(', ')}.`).setColor('#00cc66');
+              this.nextBtn.setColor('#cc0000').setInteractive({useHandCursor:true});
+              this.nextBtn.on('pointerdown',()=>{
+                SFX.advance();
+                STATE.level++;
+                this.cameras.main.fadeOut(300,0,0,0);
+                this.time.delayedCall(300,()=>this.scene.start('SceneMap'));
+              });
+            } else {
+              STATE.parts.torso.cur=0;
+              this.cameras.main.shake(900,0.06); this.cameras.main.flash(900,180,0,0);
+              this.time.delayedCall(1500,()=>{ this.cameras.main.fadeOut(600,0,0,0);
+                this.time.delayedCall(600,()=>this.scene.start('SceneGameOver')); });
+            }
+          });
+        });
+      } else {
+        this.time.delayedCall(2000,()=>{ this.cameras.main.fadeOut(600,0,0,0);
+          this.time.delayedCall(600,()=>this.scene.start('SceneGameOver')); });
+      }
+      return;
+    }
+
+    this.nextBtn.setColor('#cc0000').setInteractive({useHandCursor:true});
+    this.nextBtn.on('pointerdown',()=>{
+      SFX.advance();
+      STATE.level++;
+      this.cameras.main.fadeOut(300,0,0,0);
+      this.time.delayedCall(300,()=>this.scene.start('SceneMap'));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE: INSANITY DEATH
+// ═══════════════════════════════════════════════════════════════
+class SceneInsanity extends Phaser.Scene {
+  constructor(){ super('SceneInsanity'); }
+  create(){
+    SFX.gameOver();
+    this.cameras.main.fadeIn(800,20,0,20);
+    this.add.rectangle(W/2,H/2,W,H,0x030005);
+    for(let i=0;i<50;i++) this.add.rectangle(rnd(0,W),rnd(0,H),rnd(1,3),rnd(20,200),0x440055,rnd(3,15)/100);
+    for(let i=0;i<15;i++){
+      let r=this.add.rectangle(rnd(0,W),rnd(0,H),rnd(40,200),rnd(2,6),0x220033,0);
+      this.tweens.add({targets:r,alpha:{from:0,to:rnd(2,8)/100},duration:rnd(100,400),yoyo:true,repeat:-1,delay:rnd(0,800)});
+    }
+    this.cameras.main.shake(1200,0.02); this.cameras.main.flash(1000,30,0,40);
+    let msg=INSANITY_MSGS[rnd(0,INSANITY_MSGS.length-1)];
+    this.add.text(W/2,160,'LA MENTE CEDIÓ',{
+      fontFamily:'Cinzel Decorative',fontSize:'52px',color:'#8800aa',
+      stroke:'#000',strokeThickness:5,shadow:{color:'#cc00ff',blur:35,fill:true},align:'center'
+    }).setOrigin(0.5);
+    let msgTxt=this.add.text(W/2,290,msg,{
+      fontFamily:'Share Tech Mono',fontSize:'20px',color:'#aa44cc',align:'center',wordWrap:{width:640},lineSpacing:8
+    }).setOrigin(0.5).setAlpha(0);
+    this.tweens.add({targets:msgTxt,alpha:1,duration:1800,delay:600});
+    let p=STATE.parts;
+    let stats=[`Nivel alcanzado: ${STATE.level}  |  Oro: ${STATE.gold}`,
+      `Cordura final: 0  |  Torso: ${p.torso.cur}/${p.torso.max}`,
+      `Extremidades perdidas: ${Object.entries(p).filter(([k,v])=>v.severed).length}/4`];
+    stats.forEach((s,i)=>this.add.text(W/2,420+i*22,s,{fontFamily:'Share Tech Mono',fontSize:'13px',color:'#442255'}).setOrigin(0.5));
+    let btn=this.add.text(W/2,540,'[ REINICIAR MAZMORRA ]',{fontFamily:'Share Tech Mono',fontSize:'17px',color:'#8800aa'}).setOrigin(0.5).setInteractive({useHandCursor:true}).setAlpha(0);
+    this.tweens.add({targets:btn,alpha:{from:0,to:1},duration:600,delay:2500});
+    this.tweens.add({targets:btn,alpha:{from:0.3,to:1},duration:900,yoyo:true,repeat:-1,delay:3200});
+    btn.on('pointerover',()=>btn.setColor('#cc44ff'));
+    btn.on('pointerout', ()=>btn.setColor('#8800aa'));
+    btn.on('pointerdown',()=>{ STATE.reset(); this.cameras.main.fadeOut(400,0,0,0); this.time.delayedCall(400,()=>this.scene.start('SceneMenu')); });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ENEMY DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
+
+// Enemy limb configs: each part has hp, maxHp, severChance (% per hit when at 0)
+// effect when severed: 'dmg'=reduce att, 'acc'=reduce accuracy, 'eva'=reduce evasion
+// requiredLimb: if this limb is severed, special attack is disabled
+function mkELimbs(cfg){
+  let def={
+    head:   {exists:true,  hp:18, maxHp:18, severChance:20, effect:'kill',  effectVal:0},
+    torso:  {exists:true,  hp:999,maxHp:999,severChance:0,  effect:null,    effectVal:0},
+    armL:   {exists:true,  hp:14, maxHp:14, severChance:45, effect:'acc',   effectVal:-25},
+    armR:   {exists:true,  hp:14, maxHp:14, severChance:45, effect:'acc',   effectVal:-25},
+    legL:   {exists:true,  hp:16, maxHp:16, severChance:40, effect:'eva',   effectVal:-20},
+    legR:   {exists:true,  hp:16, maxHp:16, severChance:40, effect:'eva',   effectVal:-20},
+  };
+  for(let k in cfg){ if(def[k]) Object.assign(def[k],cfg[k]); else def[k]=cfg[k]; }
+  return def;
+}
+
+// ─── ASCII ART ───────────────────────────────────────────────────
+function skeletonArt(l){
+  let head=l.head.exists?(l.head.hp>0?'  [☠_☠]  ':'  [ x x]  '):'         ';
+  let aL=  l.armL.exists?(l.armL.hp>0?'\\':'  '):'  ';
+  let aR=  l.armR.exists?(l.armR.hp>0?'/':' '):'  ';
+  let body='  |╬╬╬|  ';
+  let lL=  l.legL.exists?(l.legL.hp>0?'/':'  '):'  ';
+  let lR=  l.legR.exists?(l.legR.hp>0?'\\':' '):'  ';
+  return head+'\n'+aL+'   '+aR+'\n'+body+'\n'+lL+'    '+lR;
+}
+function slimeArt(l){
+  let core=l.nucleo&&l.nucleo.hp>0?'  ◉◉◉◉◉  ':'  ░░░░░  ';
+  let mass=l.masa&&l.masa.hp>0?'●●●●●●●':'░░░░░░░';
+  return '  ~~~~~\n'+ core+'\n '+mass+'\n  ~~~~~';
+}
+function fungoArt(l){
+  let head=l.head.exists?(l.head.hp>0?'  (●●●●●)  ':'  (░░░░░)  '):'           ';
+  let stalk=l.tallo&&l.tallo.hp>0?'    ║║║║    ':'    ░░░░    ';
+  return head+'\n'+stalk+'\n'+stalk;
+}
+function humanArt(l){
+  let head=l.head.exists?(l.head.hp>0?'  [◉_◉]  ':'  [ X X]  '):'         ';
+  let aL=  l.armL.exists?(l.armL.hp>0?'─':' '):'  ';
+  let aR=  l.armR.exists?(l.armR.hp>0?'─':' '):'  ';
+  let body='  |▓▓▓|  ';
+  let lL=  l.legL.exists?(l.legL.hp>0?'/':' '):'  ';
+  let lR=  l.legR.exists?(l.legR.hp>0?'\\':' '):'  ';
+  return head+'\n'+aL+'     '+aR+'\n'+body+'\n'+lL+'   '+lR;
+}
+function bossArt(l){
+  let head=l.head.hp>0?'▓▓▓▓▓▓▓':'░░░░░░░';
+  let aL=  l.armL.hp>0?'╠══╣':'     ';
+  let aR=  l.armR.hp>0?'╠══╣':'     ';
+  return  '  /'+head+'\\\n'+aL+'[█████]'+aR+'\n  |█████|\n  ▓▓▓▓▓▓▓';
+}
+
+// ─── TIER 1 ──────────────────────────────────────────────────────
+const ENEMIES_T1=[
+  {
+    name:'RATA MUTADA', tier:'[ AMENAZA I ]', torsoHp:48, maxTorsoHp:48, att:8, def:1, acc:62,
+    limbData: mkELimbs({
+      head:{hp:10,maxHp:10,severChance:30},
+      armL:{hp:8,maxHp:8,severChance:55},
+      armR:{hp:8,maxHp:8,severChance:55},
+      legL:{hp:10,maxHp:10,severChance:45},
+      legR:{hp:10,maxHp:10,severChance:45},
+    }),
+    artFn: humanArt,
+    desc:'Tres ojos. Demasiados dientes. Poca amenaza.',
+    // Attack distribution: 60% torso, 15% head, 12% armL, 13% legR
+    attackDist:{torso:60,head:15,armL:12,armR:0,legL:0,legR:13},
+    specialActs:[
+      {
+        name:'MORDISCO',
+        chance:22,
+        msg:'★ LA RATA ABRE SUS FAUCES HACIA TU BRAZO. ★  [ DEFENDERSE ]',
+        evadeChance:70,
+        requiredLimb:null,
+        fn(scene){
+          let dmg=rnd(10,16);
+          let arm=chance(50)?'armL':'armR';
+          STATE.parts[arm].cur=Math.max(0,STATE.parts[arm].cur-dmg);
+          if(STATE.parts[arm].cur<=0 && chance(60)){
+            STATE.parts[arm].severed=true;
+            scene._addLog(`¡MORDISCO BRUTAL! ¡La rata arranca tu ${partName(arm)}! -${dmg} daño.`);
+          } else {
+            scene._addLog(`¡MORDISCO! Dientes en tu ${partName(arm)}. -${dmg}.`);
+          }
+          scene.cameras.main.shake(500,0.035);
+        }
+      },
+    ],
+  },
+  {
+    name:'INFANTE PODRIDO', tier:'[ AMENAZA I ]', torsoHp:55, maxTorsoHp:55, att:9, def:1, acc:58,
+    limbData: mkELimbs({
+      head:{hp:12,maxHp:12,severChance:25},
+      armL:{hp:10,maxHp:10,severChance:50},
+      armR:{hp:10,maxHp:10,severChance:50},
+      legL:{hp:12,maxHp:12,severChance:40},
+      legR:{hp:12,maxHp:12,severChance:40},
+    }),
+    artFn: humanArt,
+    desc:'No debería poder moverse. Se mueve igual.',
+    attackDist:{torso:55,head:18,armL:10,armR:10,legL:3,legR:4},
+    specialActs:[
+      {
+        name:'ABRAZO PUTREFACTO',
+        chance:20,
+        msg:'★ EL INFANTE SE LANZA A ABRAZARTE. VENENO. ★  [ DEFENDERSE ]',
+        evadeChance:72,
+        requiredLimb:null,
+        fn(scene){
+          let dmg=rnd(8,14);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          STATE.sanity-=15; clampSanity();
+          scene._addLog(`¡ABRAZO PUTREFACTO! Su podredumbre te contamina. -${dmg} TORSO. -15 CORDURA.`);
+          scene.cameras.main.shake(400,0.03); scene.cameras.main.flash(500,40,40,0);
+        }
+      },
+    ],
+  },
+  {
+    name:'SLIME ÁCIDO', tier:'[ AMENAZA I ]', torsoHp:42, maxTorsoHp:42, att:7, def:4, acc:52,
+    limbData: mkELimbs({
+      head:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      armL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      armR:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legR:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+    }),
+    slimeParts:{
+      nucleo:{hp:14,maxHp:14,severChance:70},
+      masa:  {hp:22,maxHp:22,severChance:35},
+    },
+    artFn: slimeArt,
+    desc:'Una masa viscosa con ojos. Tiene ácido en lugar de sangre.',
+    attackDist:{torso:100},
+    specialActs:[
+      {
+        name:'BAÑO ÁCIDO',
+        chance:25,
+        msg:'★ EL SLIME SE ELEVA Y PREPARA UN BAÑO ÁCIDO. ★  [ DEFENDERSE ]',
+        evadeChance:68,
+        requiredLimb:null,
+        fn(scene){
+          let dmg=rnd(10,16);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          scene._accDebuff=(scene._accDebuff||0)+12;
+          scene._addLog(`¡BAÑO ÁCIDO! El ácido corroe tu visión. -${dmg} TORSO. -12% Precisión.`);
+          scene.cameras.main.shake(400,0.03); scene.cameras.main.flash(500,80,50,0);
+        }
+      },
+    ],
+  },
+  {
+    name:'SOMBRA COJA', tier:'[ AMENAZA I ]', torsoHp:38, maxTorsoHp:38, att:10, def:0, acc:48,
+    limbData: mkELimbs({
+      head:{hp:8,maxHp:8,severChance:35},
+      armL:{hp:6,maxHp:6,severChance:55},
+      armR:{hp:6,maxHp:6,severChance:55},
+      legL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legR:{hp:9,maxHp:9,severChance:40},
+    }),
+    artFn: humanArt,
+    desc:'Más ruido que peligro. Le falta una pierna.',
+    attackDist:{torso:58,head:20,armL:11,armR:11,legL:0,legR:0},
+    specialActs:[
+      {
+        name:'GRITO VACÍO',
+        chance:25,
+        msg:'★ LA SOMBRA ABRE LA BOCA. UN SONIDO QUE NO DEBERÍA EXISTIR. ★  [ DEFENDERSE ]',
+        evadeChance:75,
+        requiredLimb:'head',
+        fn(scene){
+          STATE.sanity-=25; clampSanity();
+          let dmg=rnd(6,12);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          scene._addLog(`¡GRITO VACÍO! El sonido te perfora el cráneo. -${dmg} CABEZA. -25 CORDURA.`);
+          scene.cameras.main.flash(600,50,0,60);
+        }
+      },
+    ],
+  },
+];
+
+// ─── TIER 2 ──────────────────────────────────────────────────────
+const ENEMIES_T2=[
+  {
+    name:'CARROÑERO', tier:'[ AMENAZA II ]', torsoHp:78, maxTorsoHp:78, att:14, def:5, acc:68,
+    limbData: mkELimbs({
+      head:{hp:16,maxHp:16,severChance:22},
+      armL:{hp:14,maxHp:14,severChance:50},
+      armR:{hp:14,maxHp:14,severChance:50},
+      legL:{hp:16,maxHp:16,severChance:42},
+      legR:{hp:16,maxHp:16,severChance:42},
+    }),
+    artFn: humanArt,
+    desc:'Hambre antigua. Se mueve demasiado rápido.',
+    attackDist:{torso:55,head:14,armL:12,armR:12,legL:4,legR:3},
+    specialActs:[
+      {
+        name:'DOBLE ZARPAZO',
+        chance:22,
+        msg:'★ EL CARROÑERO EXTIENDE AMBAS GARRAS HACIA TI. ★  [ DEFENDERSE ]',
+        evadeChance:52,
+        requiredLimb:null,
+        fn(scene){
+          let dmg1=rnd(9,15), dmg2=rnd(7,11);
+          // Hits two random parts
+          let targets=['torso','armL','armR','legL','legR'];
+          let t1=targets[rnd(0,targets.length-1)];
+          let t2=targets[rnd(0,targets.length-1)];
+          STATE.parts[t1].cur=Math.max(0,STATE.parts[t1].cur-dmg1);
+          STATE.parts[t2].cur=Math.max(0,STATE.parts[t2].cur-dmg2);
+          // Chance to sever a limb
+          let arms=['armL','armR'].filter(k=>!STATE.parts[k].severed);
+          if(arms.length&&chance(32)){
+            let k=arms[rnd(0,arms.length-1)];
+            STATE.parts[k].severed=true; STATE.parts[k].cur=0;
+            scene._addLog(`¡DOBLE ZARPAZO! -${dmg1} ${partName(t1)}, -${dmg2} ${partName(t2)}. ¡Arranca tu ${partName(k)}!`);
+          } else {
+            scene._addLog(`¡DOBLE ZARPAZO! -${dmg1} ${partName(t1)}, -${dmg2} ${partName(t2)}.`);
+          }
+          scene.cameras.main.shake(550,0.04);
+        }
+      },
+    ],
+  },
+  {
+    name:'SLIME GIGANTE', tier:'[ AMENAZA II ]', torsoHp:95, maxTorsoHp:95, att:12, def:9, acc:48,
+    limbData: mkELimbs({
+      head:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      armL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      armR:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legR:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+    }),
+    slimeParts:{
+      nucleo:{hp:20,maxHp:20,severChance:60},
+      masa:  {hp:36,maxHp:36,severChance:28},
+    },
+    artFn: slimeArt,
+    desc:'Una montaña de ácido vivo. El núcleo pulsa con fuerza.',
+    attackDist:{torso:100},
+    specialActs:[
+      {
+        name:'INMERSIÓN ÁCIDA',
+        chance:28,
+        msg:'★ EL SLIME SE EXPANDE. TE VA A ENVOLVER COMPLETO. ★  [ DEFENDERSE ]',
+        evadeChance:45,
+        requiredLimb:null,
+        fn(scene){
+          let dmg=rnd(16,24);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          scene._accDebuff=(scene._accDebuff||0)+18;
+          STATE.sanity-=8; clampSanity();
+          // Corrode a limb
+          let limbs=['armL','armR','legL','legR'].filter(k=>!STATE.parts[k].severed);
+          if(limbs.length&&chance(40)){
+            let k=limbs[rnd(0,limbs.length-1)];
+            let ldmg=rnd(8,14); STATE.parts[k].cur=Math.max(0,STATE.parts[k].cur-ldmg);
+            scene._addLog(`¡INMERSIÓN ÁCIDA! -${dmg} TORSO. -${ldmg} ${partName(k)}. -18% Precisión. -8 CORDURA.`);
+          } else {
+            scene._addLog(`¡INMERSIÓN ÁCIDA! -${dmg} TORSO. -18% Precisión. -8 CORDURA.`);
+          }
+          scene.cameras.main.shake(500,0.04); scene.cameras.main.flash(600,80,50,0);
+        }
+      },
+    ],
+  },
+  {
+    name:'FUNGO GIGANTE', tier:'[ AMENAZA II ]', torsoHp:108, maxTorsoHp:108, att:10, def:10, acc:58,
+    limbData: mkELimbs({
+      head:{hp:22,maxHp:22,severChance:18},
+      armL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      armR:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legR:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      tallo:{exists:true, hp:40,maxHp:40,severChance:0, effect:'dmg', effectVal:-0.4},
+    }),
+    artFn: fungoArt,
+    desc:'Un hongo del tamaño de un hombre. Su cabeza es una nube de esporas.',
+    attackDist:{torso:65,head:20,tallo:15},
+    specialActs:[
+      {
+        name:'NUBE DE ESPORAS',
+        chance:25,
+        msg:'★ EL FUNGO LIBERA UNA NUBE. CIERRA LOS OJOS. ★  [ DEFENDERSE ]',
+        evadeChance:55,
+        requiredLimb:'head',
+        fn(scene){
+          STATE.sanity-=22; clampSanity();
+          let dmg=rnd(6,12);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          scene._accDebuff=(scene._accDebuff||0)+10;
+          scene._addLog(`¡NUBE DE ESPORAS! Inhalas veneno. -${dmg} CABEZA. -22 CORDURA. -10% Precisión.`);
+          scene.cameras.main.flash(700,20,40,0);
+        }
+      },
+      {
+        name:'GOLPE DE TALLO',
+        chance:20,
+        msg:'★ EL FUNGO BALANCEA SU TALLO COMO UN ARIETE. ★  [ DEFENDERSE ]',
+        evadeChance:58,
+        requiredLimb:'tallo',
+        fn(scene){
+          let dmg=rnd(14,22);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          if(chance(35)){
+            let leg=chance(50)?'legL':'legR';
+            if(!STATE.parts[leg].severed){
+              let ldmg=rnd(8,14); STATE.parts[leg].cur=Math.max(0,STATE.parts[leg].cur-ldmg);
+              scene._addLog(`¡GOLPE DE TALLO! -${dmg} TORSO. -${ldmg} ${partName(leg)}.`);
+            } else {
+              scene._addLog(`¡GOLPE DE TALLO! -${dmg} TORSO.`);
+            }
+          } else {
+            scene._addLog(`¡GOLPE DE TALLO! El impacto te sacude. -${dmg} TORSO.`);
+          }
+          scene.cameras.main.shake(600,0.04);
+        }
+      },
+    ],
+  },
+  {
+    name:'PENITENTE', tier:'[ AMENAZA II ]', torsoHp:82, maxTorsoHp:82, att:16, def:4, acc:70,
+    limbData: mkELimbs({
+      head:{hp:16,maxHp:16,severChance:20},
+      armL:{hp:14,maxHp:14,severChance:48},
+      armR:{hp:14,maxHp:14,severChance:48},
+      legL:{hp:16,maxHp:16,severChance:40},
+      legR:{hp:16,maxHp:16,severChance:40},
+    }),
+    artFn: humanArt,
+    desc:'Se flagelló hasta no sentir dolor. Ahora lo reparte.',
+    attackDist:{torso:55,head:16,armL:12,armR:12,legL:3,legR:2},
+    specialActs:[
+      {
+        name:'FLAGELACIÓN',
+        chance:22,
+        msg:'★ EL PENITENTE ALZA EL LÁTIGO HACIA TI. ★  [ DEFENDERSE ]',
+        evadeChance:50,
+        requiredLimb:'armR',
+        fn(scene){
+          let dmg=rnd(13,20);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          let alive=Object.entries(STATE.parts).filter(([k,p])=>!p.severed&&k!=='torso'&&k!=='head');
+          if(alive.length&&chance(38)){
+            let [k,p]=alive[rnd(0,alive.length-1)];
+            p.severed=true; p.cur=0;
+            scene._addLog(`¡FLAGELACIÓN! El látigo te envuelve. -${dmg} TORSO. ¡${partName(k)} ARRANCADO!`);
+          } else {
+            scene._addLog(`¡FLAGELACIÓN! El látigo te envuelve. -${dmg} TORSO.`);
+          }
+          scene.cameras.main.shake(500,0.035);
+        }
+      },
+    ],
+  },
+];
+
+// ─── TIER 3 ──────────────────────────────────────────────────────
+const ENEMIES_T3=[
+  {
+    name:'HEREJE MUTILADO', tier:'[ AMENAZA III ]', torsoHp:108, maxTorsoHp:108, att:20, def:5, acc:63,
+    limbData: mkELimbs({
+      head:{hp:20,maxHp:20,severChance:18},
+      armL:{hp:18,maxHp:18,severChance:42},
+      armR:{hp:18,maxHp:18,severChance:42},
+      legL:{hp:22,maxHp:22,severChance:35},
+      legR:{hp:22,maxHp:22,severChance:35},
+    }),
+    artFn: humanArt,
+    desc:'Sin párpados. Nunca duerme. Nunca olvida.',
+    attackDist:{torso:52,head:18,armL:12,armR:12,legL:3,legR:3},
+    specialActs:[
+      {
+        name:'OJO ETERNO',
+        chance:20,
+        msg:'★ EL HEREJE TE CLAVA LA MIRADA. ALGO ENTRA EN TU MENTE. ★  [ DEFENDERSE ]',
+        evadeChance:45,
+        requiredLimb:'head',
+        fn(scene){
+          STATE.sanity-=28; clampSanity();
+          let dmg=rnd(10,16);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          scene._addLog(`¡OJO ETERNO! Te devuelve algo que vio. -${dmg} CABEZA. -28 CORDURA.`);
+          scene.cameras.main.flash(700,50,0,50);
+        }
+      },
+      {
+        name:'GOLPE DESCARNADO',
+        chance:18,
+        msg:'★ EL HEREJE LEVANTA SU MUÑÓN HACIA TU CABEZA. ★  [ DEFENDERSE ]',
+        evadeChance:48,
+        requiredLimb:null,
+        fn(scene){
+          let dmg=rnd(16,24);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          scene._addLog(`¡GOLPE DESCARNADO! Apunta a tu cabeza. -${dmg} CABEZA.`);
+          scene.cameras.main.shake(600,0.04);
+        }
+      },
+    ],
+  },
+  {
+    name:'ESPECTRO COJO', tier:'[ AMENAZA III ]', torsoHp:96, maxTorsoHp:96, att:23, def:3, acc:73,
+    limbData: mkELimbs({
+      head:{hp:18,maxHp:18,severChance:20},
+      armL:{hp:16,maxHp:16,severChance:44},
+      armR:{hp:16,maxHp:16,severChance:44},
+      legL:{exists:false,hp:0,maxHp:0,severChance:0,effect:null,effectVal:0},
+      legR:{hp:20,maxHp:20,severChance:36},
+    }),
+    artFn: humanArt,
+    desc:'Murió con rabia. La rabia sobrevivió.',
+    attackDist:{torso:50,head:20,armL:15,armR:15,legL:0,legR:0},
+    specialActs:[
+      {
+        name:'POSESIÓN PARCIAL',
+        chance:22,
+        msg:'★ EL ESPECTRO SE FUNDE CONTIGO POR UN MOMENTO. ★  [ DEFENDERSE ]',
+        evadeChance:45,
+        requiredLimb:null,
+        fn(scene){
+          // 2 attacks at random parts
+          let parts=['torso','torso','head','armL','armR','legL','legR'];
+          let t1=parts[rnd(0,parts.length-1)];
+          let t2=parts[rnd(0,parts.length-1)];
+          let dmg1=rnd(12,18), dmg2=rnd(10,16);
+          STATE.parts[t1].cur=Math.max(0,STATE.parts[t1].cur-dmg1);
+          STATE.parts[t2].cur=Math.max(0,STATE.parts[t2].cur-dmg2);
+          STATE.sanity-=12; clampSanity();
+          scene._addLog(`¡POSESIÓN PARCIAL! Ataca desde dentro. -${dmg1} ${partName(t1)}, -${dmg2} ${partName(t2)}. -12 CORDURA.`);
+          scene.cameras.main.shake(600,0.04); scene.cameras.main.flash(500,60,0,80);
+        }
+      },
+      {
+        name:'ATAQUE ESPECTRAL',
+        chance:20,
+        msg:'★ EL ESPECTRO MATERIALIZA UNA ZARPA HACIA TU GARGANTA. ★  [ DEFENDERSE ]',
+        evadeChance:42,
+        requiredLimb:'armR',
+        fn(scene){
+          let dmg=rnd(18,26);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          STATE.sanity-=15; clampSanity();
+          scene._addLog(`¡ATAQUE ESPECTRAL! Te atraviesa el cuello. -${dmg} CABEZA. -15 CORDURA.`);
+          scene.cameras.main.shake(600,0.04);
+        }
+      },
+    ],
+  },
+  {
+    name:'CARNICERO CIEGO', tier:'[ AMENAZA III ]', torsoHp:120, maxTorsoHp:120, att:18, def:7, acc:52,
+    limbData: mkELimbs({
+      head:{hp:22,maxHp:22,severChance:15},
+      armL:{hp:20,maxHp:20,severChance:38},
+      armR:{hp:20,maxHp:20,severChance:38},
+      legL:{hp:24,maxHp:24,severChance:32},
+      legR:{hp:24,maxHp:24,severChance:32},
+    }),
+    artFn: humanArt,
+    desc:'No necesita verte para encontrarte.',
+    attackDist:{torso:60,head:12,armL:10,armR:10,legL:4,legR:4},
+    specialActs:[
+      {
+        name:'TAJO CIEGO',
+        chance:28,
+        msg:'★ EL CARNICERO BALANCEA SU CUCHILLO SIN MIRAR. ★  [ DEFENDERSE ]',
+        evadeChance:40,
+        requiredLimb:'armR',
+        fn(scene){
+          let dmg=rnd(20,28);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          let alive=Object.entries(STATE.parts).filter(([k,p])=>!p.severed&&k!=='torso');
+          if(alive.length&&chance(52)){
+            let [k,p]=alive[rnd(0,alive.length-1)];
+            p.severed=true; p.cur=0;
+            scene._addLog(`¡TAJO CIEGO! -${dmg} TORSO. ¡${partName(k)} AMPUTADO!`);
+          } else {
+            scene._addLog(`¡TAJO CIEGO! Un corte brutal. -${dmg} TORSO.`);
+          }
+          scene.cameras.main.shake(700,0.05);
+        }
+      },
+      {
+        name:'GOLPE SORDO',
+        chance:18,
+        msg:'★ EL CARNICERO LANZA UN PUÑETAZO A CIEGAS HACIA TU PECHO. ★  [ DEFENDERSE ]',
+        evadeChance:44,
+        requiredLimb:'armL',
+        fn(scene){
+          let dmg=rnd(16,24);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          let dmg2=rnd(8,14);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg2);
+          scene._addLog(`¡GOLPE SORDO! Dos impactos sin mirar. -${dmg} TORSO. -${dmg2} CABEZA.`);
+          scene.cameras.main.shake(500,0.04);
+        }
+      },
+    ],
+  },
+  {
+    name:'ESQUELETO VETERANO', tier:'[ AMENAZA III ]', torsoHp:102, maxTorsoHp:102, att:19, def:6, acc:60,
+    limbData: mkELimbs({
+      head:{hp:16,maxHp:16,severChance:22},
+      armL:{hp:13,maxHp:13,severChance:58},
+      armR:{hp:13,maxHp:13,severChance:58},
+      legL:{hp:18,maxHp:18,severChance:50},
+      legR:{hp:18,maxHp:18,severChance:50},
+    }),
+    artFn: skeletonArt,
+    desc:'Hueso que se niega a morir. Técnica de guerra antigua.',
+    attackDist:{torso:55,head:16,armL:10,armR:10,legL:5,legR:4},
+    specialActs:[
+      {
+        name:'ESTOCADA',
+        chance:22,
+        msg:'★ EL ESQUELETO APUNTA SU ESPADA A TU PECHO. ★  [ DEFENDERSE ]',
+        evadeChance:50,
+        requiredLimb:'armR',
+        fn(scene){
+          let dmg=rnd(18,26);
+          STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+          let alive=Object.entries(STATE.parts).filter(([k,p])=>!p.severed&&k!=='torso'&&k!=='head');
+          if(alive.length&&chance(45)){
+            let [k,p]=alive[rnd(0,alive.length-1)];
+            p.severed=true; p.cur=0;
+            scene._addLog(`¡ESTOCADA! La espada pasa de largo y te rebana. -${dmg} TORSO. ¡${partName(k)} AMPUTADO!`);
+          } else {
+            scene._addLog(`¡ESTOCADA! La hoja entra profundo. -${dmg} TORSO.`);
+          }
+          scene.cameras.main.shake(600,0.04);
+        }
+      },
+      {
+        name:'PATADA',
+        chance:20,
+        msg:'★ EL ESQUELETO LEVANTA LA PIERNA IZQUIERDA HACIA TU CABEZA. ★  [ DEFENDERSE ]',
+        evadeChance:55,
+        requiredLimb:'legL',
+        fn(scene){
+          let dmg=rnd(14,20);
+          STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+          STATE.sanity-=10; clampSanity();
+          scene._addLog(`¡PATADA! El fémur impacta tu cráneo. -${dmg} CABEZA. -10 CORDURA.`);
+          scene.cameras.main.shake(500,0.035);
+        }
+      },
+    ],
+  },
+];
+
+// ─── BOSS ────────────────────────────────────────────────────────
+const BOSS={
+  name:'EL INNOMBRABLE', tier:'[ ⚠ JEFE FINAL ⚠ ]', torsoHp:220, maxTorsoHp:220, att:30, def:8, acc:78,
+  limbData: mkELimbs({
+    head:{hp:65,maxHp:65,severChance:5},
+    torso:{hp:999,maxHp:999,severChance:0,effect:null,effectVal:0},
+    armL:{hp:55,maxHp:55,severChance:18},
+    armR:{hp:55,maxHp:55,severChance:18},
+    legL:{hp:60,maxHp:60,severChance:15},
+    legR:{hp:60,maxHp:60,severChance:15},
+  }),
+  artFn: bossArt,
+  desc:'Existe antes que el idioma. No puede describirse sin enloquecer.',
+  attackDist:{torso:48,head:22,armL:10,armR:10,legL:5,legR:5},
+  specialActs:[],
+};
+
+function pickEnemy(level){
+  if(level<=2) return ENEMIES_T1[rnd(0,ENEMIES_T1.length-1)];
+  if(level===3) return chance(60)?ENEMIES_T1[rnd(0,ENEMIES_T1.length-1)]:ENEMIES_T2[rnd(0,ENEMIES_T2.length-1)];
+  if(level===4) return chance(50)?ENEMIES_T2[rnd(0,ENEMIES_T2.length-1)]:ENEMIES_T3[rnd(0,ENEMIES_T3.length-1)];
+  return ENEMIES_T3[rnd(0,ENEMIES_T3.length-1)];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE: BATTLE
+// ═══════════════════════════════════════════════════════════════
+class SceneBattle extends Phaser.Scene {
+  constructor(){ super('SceneBattle'); }
+
+  init(data){
+    this.isBoss=(data&&data.isBoss===true)?true:false;
+    let tmpl=this.isBoss?BOSS:pickEnemy(STATE.level);
+    this.enemy=JSON.parse(JSON.stringify(tmpl));
+    this.enemy.artFn=tmpl.artFn;
+    this.enemy.specialActs=tmpl.specialActs||[];
+    // Set torsoHp on enemy object
+    this.enemy.hp=this.enemy.torsoHp;
+    this.playerTurn=true; this.battleOver=false;
+    this.coinUsed=STATE.coinUsed||false;
+    this.nextCritical=false;
+    this.defending=false; this.enemyStunned=false;
+    this.pendingSpecial=null;
+    this.log=[];
+    this._accDebuff=0;
+  }
+
+  create(){
+    this.cameras.main.fadeIn(400,0,0,0);
+    this.add.rectangle(W/2,H/2,W,H,C.BLACK);
+    for(let i=0;i<15;i++) this.add.rectangle(rnd(0,W),rnd(0,H),1,rnd(50,200),C.RED,rnd(2,10)/100);
+
+    this.add.text(W/2,18,this.isBoss?'⚠  JEFE FINAL  ⚠':'— COMBATE —',{
+      fontFamily:'Share Tech Mono',fontSize:this.isBoss?'20px':'14px',
+      color:this.isBoss?'#ff2222':'#666666',letterSpacing:4
+    }).setOrigin(0.5);
+
+    this._buildEnemySide();
+    this._buildPlayerSide();
+    this._buildLog();
+    this._buildActions();
+
+    STATE.addLog(`[NV${STATE.level}] BATALLA vs ${this.enemy.name}`);
+    this._addLog(`${this.enemy.name} aparece. ${this.enemy.desc}`);
+    if(this.isBoss){ this.cameras.main.flash(800,100,0,0); this.cameras.main.shake(600,0.022); SFX.bossEncounter(); }
+
+    let sanPen=STATE.getSanityPenalties();
+    if(sanPen.acc>0||sanPen.dmg>0) this._addLog(`⚠ LOCURA: -${sanPen.acc}% Precisión, -${sanPen.dmg} Daño`);
+  }
+
+  // ── Enemy side UI ──────────────────────────────────────────────
+  _buildEnemySide(){
+    let ex=210, ey=248;
+    // Name above box — well clear of box top (ey-77=171)
+    this.add.text(ex,ey-112,this.enemy.name,{fontFamily:'Share Tech Mono',fontSize:'12px',color:'#cc0000',align:'center',wordWrap:{width:175}}).setOrigin(0.5);
+    const tierColor = this.enemy.tier?.includes('III')?'#cc6600':this.enemy.tier?.includes('II')?'#aaaa00':this.enemy.tier?.includes('JEFE')?'#ff2222':'#22aa22';
+    this.add.text(ex,ey-96,this.enemy.tier||'',{fontFamily:'Share Tech Mono',fontSize:'9px',color:tierColor,align:'center'}).setOrigin(0.5);
+    this.enemyDebuffTxt=this.add.text(ex,ey-84,'',{fontFamily:'Share Tech Mono',fontSize:'9px',color:'#aa2200',align:'center'}).setOrigin(0.5);
+
+    this.enemyBox=this.add.rectangle(ex,ey,185,155,C.GREY,0.8).setStrokeStyle(2,C.RED,0.7);
+    this.enemyBodyTxt=this.add.text(ex,ey,this._enemyBodyArt(),{fontFamily:'Share Tech Mono',fontSize:'12px',color:'#cccccc',align:'center',lineSpacing:3}).setOrigin(0.5);
+
+    // Torso HP — BELOW the box
+    let boxBottom=ey+78;
+    this.enemyHpTxt=this.add.text(ex,boxBottom+16,`TORSO: ${this.enemy.hp}/${this.enemy.maxTorsoHp||this.enemy.torsoHp}`,{fontFamily:'Share Tech Mono',fontSize:'16px',color:'#cc0000',stroke:'#000',strokeThickness:2}).setOrigin(0.5);
+
+    // Separator line
+    this.add.rectangle(ex,boxBottom+30,170,1,0x330000,0.7);
+
+    // Limb HP numbers below — centered around ex
+    this.enemyLimbNumTxts={};
+    let ld=this.enemy.limbData;
+
+    if(this.enemy.slimeParts){
+      let sp=this.enemy.slimeParts;
+      let ly=boxBottom+42;
+      this.add.text(ex-35,ly,'NUC',{fontFamily:'Share Tech Mono',fontSize:'10px',color:'#664400'}).setOrigin(0.5);
+      this.enemyLimbNumTxts['nucleo']=this.add.text(ex-35,ly+18,`${sp.nucleo.hp}`,{fontFamily:'Share Tech Mono',fontSize:'16px',color:'#cc4400'}).setOrigin(0.5);
+      this.add.text(ex+35,ly,'MAS',{fontFamily:'Share Tech Mono',fontSize:'10px',color:'#555'}).setOrigin(0.5);
+      this.enemyLimbNumTxts['masa']=this.add.text(ex+35,ly+18,`${sp.masa.hp}`,{fontFamily:'Share Tech Mono',fontSize:'16px',color:'#886600'}).setOrigin(0.5);
+      return;
+    }
+
+    // Build list of existing limbs for centered layout
+    let limbDefs=[];
+    if(ld.head&&ld.head.exists) limbDefs.push({k:'head',label:'CAB',l:ld.head,col:this._limbNumColor(ld.head.hp,ld.head.maxHp)});
+    ['armL','armR','legL','legR','tallo'].forEach(k=>{
+      let lb={armL:'B.IZ',armR:'B.DE',legL:'P.IZ',legR:'P.DE',tallo:'TLL'};
+      let l=ld[k]; if(!l||!l.exists) return;
+      limbDefs.push({k,label:lb[k]||k.slice(0,3),l,col:this._limbNumColor(l.hp,l.maxHp)});
+    });
+
+    let n=limbDefs.length;
+    let colW=32, totalW=(n-1)*colW;
+    let startX=ex-totalW/2;
+    let ly=boxBottom+42;
+    limbDefs.forEach(({k,label,l,col},i)=>{
+      let lx=startX+i*colW;
+      this.add.text(lx,ly,label,{fontFamily:'Share Tech Mono',fontSize:'9px',color:'#555'}).setOrigin(0.5);
+      let t=this.add.text(lx,ly+16,`${l.hp}`,{fontFamily:'Share Tech Mono',fontSize:'15px',color:col}).setOrigin(0.5);
+      this.enemyLimbNumTxts[k]=t;
+    });
+  }
+
+  // ── Player side UI ─────────────────────────────────────────────
+  _buildPlayerSide(){
+    let px=590, py=248;
+    // Name and class ABOVE the box — box top is at py-77=171, so names at ~148 and 160
+    this.add.text(px,py-112,PLAYER_NAME,{fontFamily:'Share Tech Mono',fontSize:'12px',color:'#33aa33'}).setOrigin(0.5);
+    this.add.text(px,py-98,`[ ${PLAYER_CLASS.name} ]`,{fontFamily:'Share Tech Mono',fontSize:'9px',color:'#446622'}).setOrigin(0.5);
+
+    this.playerBox=this.add.rectangle(px,py,185,155,C.GREY,0.8).setStrokeStyle(2,0x334433,0.7);
+    this.playerBodyTxt=this.add.text(px,py,this._playerBodyArt(),{fontFamily:'Share Tech Mono',fontSize:'13px',color:'#aaccaa',align:'center',lineSpacing:4}).setOrigin(0.5);
+
+    // Torso HP — BELOW the box
+    let boxBottom=py+78;
+    let p=STATE.parts;
+    let torsoCol=this._limbNumColor(p.torso.cur,p.torso.max);
+    this.playerTorsoTxt=this.add.text(px,boxBottom+16,`TORSO: ${p.torso.cur}/${p.torso.max}`,{fontFamily:'Share Tech Mono',fontSize:'16px',color:torsoCol,stroke:'#000',strokeThickness:2}).setOrigin(0.5);
+
+    // Separator
+    this.add.rectangle(px,boxBottom+30,170,1,0x224422,0.7);
+
+    // Limbs — centered around px
+    this.playerLimbNumTxts={};
+    let partKeys=['head','armL','armR','legL','legR'];
+    let labels=['CAB','B.IZ','B.DE','P.IZ','P.DE'];
+    let n=partKeys.length, colW=35, totalW=(n-1)*colW;
+    let startX=px-totalW/2;
+    let ly=boxBottom+42;
+    partKeys.forEach((k,i)=>{
+      let pp=STATE.parts[k];
+      let col=pp.severed?'#550000':this._limbNumColor(pp.cur,pp.max);
+      let val=pp.severed?'✗':pp.cur;
+      let lx=startX+i*colW;
+      this.add.text(lx,ly,labels[i],{fontFamily:'Share Tech Mono',fontSize:'9px',color:'#446633'}).setOrigin(0.5);
+      let t=this.add.text(lx,ly+16,`${val}`,{fontFamily:'Share Tech Mono',fontSize:'15px',color:col}).setOrigin(0.5);
+      this.playerLimbNumTxts[k]=t;
+    });
+    this.playerLimbNumTxts['torso']=this.playerTorsoTxt;
+
+    // SAN — bigger, more separated
+    this.playerSanTxt=this.add.text(px,boxBottom+76,`CORDURA: ${STATE.sanity}`,{fontFamily:'Share Tech Mono',fontSize:'13px',color:sanColor(STATE.sanity),stroke:'#000',strokeThickness:1}).setOrigin(0.5);
+    // DMG — mismo formato
+    let dmgPenInit=STATE.getTotalDmgPenalty();
+    let dmgMinInit=Math.max(1,8+STATE.buffs.damage-dmgPenInit);
+    let dmgMaxInit=Math.max(1,18+STATE.buffs.damage-dmgPenInit);
+    let dmgColInit=dmgPenInit===0?'#226622':dmgPenInit<5?'#aaaa00':'#cc0000';
+    this.playerDmgTxt=this.add.text(px,boxBottom+94,`DMG: ${dmgMinInit}~${dmgMaxInit}`,{fontFamily:'Share Tech Mono',fontSize:'13px',color:dmgColInit,stroke:'#000',strokeThickness:1}).setOrigin(0.5);
+
+    // Mostrar siempre Prec y Eva — colores dinámicos según penalización
+    let pen=STATE.getLimbPenalties();
+    let precPen=pen.accLimb+(pen.accSan||0); // _accDebuff siempre 0 al inicio
+    let evaPen=pen.eva;
+    let precVal=Math.max(0,100-precPen);
+    let evaVal=Math.max(0,100-evaPen);
+    let precStr=`PREC ${precVal}%`;
+    let evaStr=`EVA ${evaVal}%`;
+    let precCol=precVal===100?'#226622':precVal>=70?'#aaaa00':'#cc0000';
+    let evaCol=evaVal===100?'#226622':evaVal>=70?'#aaaa00':'#cc0000';
+    this.playerPrecTxt=this.add.text(px-48,py-84,precStr,{fontFamily:'Share Tech Mono',fontSize:'9px',color:precCol}).setOrigin(0.5);
+    this.playerEvaTxt =this.add.text(px+48,py-84,evaStr, {fontFamily:'Share Tech Mono',fontSize:'9px',color:evaCol}).setOrigin(0.5);
+    // Calcular texto inicial de debuffs (mente/veneno) al construir
+    let initPp=[];
+    let initSanPen=STATE.getSanityPenalties();
+    if(initSanPen.acc>0||initSanPen.dmg>0){
+      let parts=[];
+      if(initSanPen.acc>0) parts.push(`-${initSanPen.acc}% Prec`);
+      if(initSanPen.dmg>0) parts.push(`-${initSanPen.dmg} Dmg`);
+      initPp.push(`Mente baja: ${parts.join(', ')}`);
+    }
+    this.playerDebuffTxt=this.add.text(px,boxBottom+112,initPp.join('  '),{fontFamily:'Share Tech Mono',fontSize:'8px',color:'#aa2200'}).setOrigin(0.5);
+  }
+
+  _buildLog(){
+    this.add.rectangle(W/2,552,W-20,88,C.DARK,0.95).setStrokeStyle(1,C.ASH,0.4);
+    this.add.text(20,511,'// TERMINAL:',{fontFamily:'Share Tech Mono',fontSize:'10px',color:'#333'});
+    this.logTexts=[];
+    for(let i=0;i<4;i++){
+      this.logTexts.push(this.add.text(22,523+i*20,'',{fontFamily:'Share Tech Mono',fontSize:'11px',color:'#446644',wordWrap:{width:756}}));
+    }
+  }
+
+  _buildActions(){
+    this.add.text(15,72,'APUNTAR:',{fontFamily:'Share Tech Mono',fontSize:'11px',color:'#444'}).setOrigin(0,0.5);
+    let validTargets=this._getValidTargets();
+    this.selectedTarget=validTargets.includes('torso')?'torso':validTargets[0];
+    this.targetBtns={}; this.targetPctTxts={};
+
+    let startX=108, spacing=88;
+    const targetLabels={torso:'Torso',head:'Cabeza',armL:'B.Izq',armR:'B.Der',legL:'P.Izq',legR:'P.Der',nucleo:'Núcleo',masa:'Masa',tallo:'Tallo'};
+
+    validTargets.forEach((lmb,i)=>{
+      let hc=this._getHitChance(lmb);
+      let displayName=targetLabels[lmb]||lmb;
+      let tx=startX+i*spacing;
+      let btn=this.add.text(tx,70,displayName,{
+        fontFamily:'Share Tech Mono',fontSize:'11px',color:'#666666',
+        backgroundColor:'#111',padding:{x:4,y:2}
+      }).setOrigin(0.5).setInteractive({useHandCursor:true});
+      let pctCol=hc>=60?'#448844':hc>=40?'#888833':'#883333';
+      let pct=this.add.text(tx,85,`${hc}%`,{fontFamily:'Share Tech Mono',fontSize:'10px',color:pctCol,align:'center'}).setOrigin(0.5);
+      btn.on('pointerdown',()=>this._selectTarget(lmb));
+      this.targetBtns[lmb]=btn; this.targetPctTxts[lmb]=pct;
+    });
+    this._selectTarget(this.selectedTarget);
+
+    let btnAtk=this.add.text(130,463,'[ ATACAR ]',{fontFamily:'Share Tech Mono',fontSize:'18px',color:'#cc0000',stroke:'#000',strokeThickness:2}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btnAtk.on('pointerover',()=>{btnAtk.setScale(1.06);btnAtk.setColor('#ff4444');});
+    btnAtk.on('pointerout', ()=>{btnAtk.setScale(1);btnAtk.setColor('#cc0000');});
+    btnAtk.on('pointerdown',()=>{if(this.playerTurn&&!this.battleOver&&!this.pendingSpecial)this._playerAttack();});
+    this.atkBtn=btnAtk;
+
+    let btnFlee=this.add.text(320,463,'[ HUIR ]',{fontFamily:'Share Tech Mono',fontSize:'18px',color:'#884400',stroke:'#000',strokeThickness:2}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btnFlee.on('pointerover',()=>{btnFlee.setScale(1.06);btnFlee.setColor('#cc6600');});
+    btnFlee.on('pointerout', ()=>{btnFlee.setScale(1);btnFlee.setColor('#884400');});
+    btnFlee.on('pointerdown',()=>{if(this.playerTurn&&!this.battleOver&&!this.pendingSpecial)this._flee();});
+    this.fleeBtn=btnFlee;
+
+    this.defendBtn=this.add.text(W/2,463,'[ DEFENDERSE ]',{
+      fontFamily:'Share Tech Mono',fontSize:'17px',color:'#446688',stroke:'#000',strokeThickness:2,
+      backgroundColor:'#001122',padding:{x:8,y:4}
+    }).setOrigin(0.5).setInteractive({useHandCursor:true}).setVisible(false);
+    this.defendBtn.on('pointerover',()=>{this.defendBtn.setScale(1.06);this.defendBtn.setColor('#88aaff');});
+    this.defendBtn.on('pointerout', ()=>{this.defendBtn.setScale(1);this.defendBtn.setColor('#446688');});
+    this.defendBtn.on('pointerdown',()=>{if(this.pendingSpecial)this._playerDefend();});
+
+    this.telegraphTxt=this.add.text(W/2,487,'',{
+      fontFamily:'Share Tech Mono',fontSize:'12px',color:'#ff8800',
+      align:'center',wordWrap:{width:700},stroke:'#000',strokeThickness:2
+    }).setOrigin(0.5).setVisible(false);
+  }
+
+  _getValidTargets(){
+    if(this.enemy.slimeParts){
+      return ['masa','nucleo'];
+    }
+    let targets=['torso'];
+    let ld=this.enemy.limbData;
+    // Head first
+    if(ld.head&&ld.head.exists&&ld.head.hp>0) targets.push('head');
+    // Tallo for fungo
+    if(ld.tallo&&ld.tallo.exists&&ld.tallo.hp>0) targets.push('tallo');
+    // Arms
+    if(ld.armL&&ld.armL.exists&&ld.armL.hp>0) targets.push('armL');
+    if(ld.armR&&ld.armR.exists&&ld.armR.hp>0) targets.push('armR');
+    // Legs
+    if(ld.legL&&ld.legL.exists&&ld.legL.hp>0) targets.push('legL');
+    if(ld.legR&&ld.legR.exists&&ld.legR.hp>0) targets.push('legR');
+    return targets;
+  }
+
+  // ── Graphics helpers ───────────────────────────────────────────
+  _limbNumColor(cur,max){
+    if(!max) return '#444';
+    let pct=cur/max;
+    return pct>0.6?'#22aa22':pct>0.3?'#aaaa00':'#cc0000';
+  }
+  _selectTarget(lmb){
+    this.selectedTarget=lmb;
+    Object.keys(this.targetBtns).forEach(k=>this.targetBtns[k].setColor(k===lmb?'#ff4444':'#666666'));
+    this._refreshTargetPcts();
+  }
+  _refreshTargetPcts(){
+    if(!this.targetPctTxts) return;
+    Object.keys(this.targetPctTxts).forEach(lmb=>{
+      let hc=this._getHitChance(lmb);
+      let col=this.selectedTarget===lmb?'#ff6666':hc>=60?'#448844':hc>=40?'#888833':'#883333';
+      this.targetPctTxts[lmb].setText(`${hc}%`).setColor(col);
+    });
+  }
+  _rebuildTargetBtns(){
+    if(!this.targetBtns) return;
+    for(let k in this.targetBtns){
+      let btn=this.targetBtns[k]; let pct=this.targetPctTxts[k];
+      let severed=false;
+      if(k==='torso') severed=false;
+      else if(k==='nucleo'||k==='masa'){
+        severed=this.enemy.slimeParts?this.enemy.slimeParts[k].hp<=0:false;
+      } else {
+        let ld=this.enemy.limbData[k];
+        severed=!ld||!ld.exists||ld.hp<=0;
+      }
+      if(severed){
+        btn.setColor('#333333').disableInteractive();
+        if(pct) pct.setText('✗').setColor('#333333');
+        if(this.selectedTarget===k) this._selectTarget('torso');
+      }
+    }
+  }
+
+  _enemyBodyArt(){
+    if(this.enemy.slimeParts){
+      return slimeArt({nucleo:this.enemy.slimeParts.nucleo, masa:this.enemy.slimeParts.masa});
+    }
+    return this.enemy.artFn(this.enemy.limbData);
+  }
+  _playerBodyArt(){
+    let p=STATE.parts;
+    let h=p.head.severed?' [X X] ':p.head.cur>0?' [●_●] ':' [X X] ';
+    let aL=p.armL.severed?' ':p.armL.cur>0?'─':' ';
+    let aR=p.armR.severed?' ':p.armR.cur>0?'─':' ';
+    let tr=p.torso.cur>0?' |███| ':' |░░░| ';
+    let lL=p.legL.severed?' ':p.legL.cur>0?'/':' ';
+    let lR=p.legR.severed?' ':p.legR.cur>0?'\\':' ';
+    return h+'\n'+aL+'   '+aR+'\n'+tr+'\n'+lL+'  '+lR;
+  }
+  _enemyLimbStr(){
+    if(this.enemy.slimeParts){
+      let sp=this.enemy.slimeParts;
+      return `Núcleo:${sp.nucleo.hp}/${sp.nucleo.maxHp} Masa:${sp.masa.hp}/${sp.masa.maxHp}`;
+    }
+    let parts=[];
+    let ld=this.enemy.limbData;
+    if(ld.head&&ld.head.exists) parts.push(`CAB:${ld.head.hp>0?ld.head.hp:'✗'}`);
+    if(ld.tallo&&ld.tallo.exists) parts.push(`TLL:${ld.tallo.hp>0?ld.tallo.hp:'✗'}`);
+    ['armL','armR','legL','legR'].forEach(k=>{
+      let l=ld[k]; if(!l||!l.exists) return;
+      parts.push(`${partName(k).slice(0,3)}:${l.hp>0?l.hp:'✗'}`);
+    });
+    return parts.join(' ');
+  }
+  _addLog(msg){
+    this.log.unshift(msg);
+    this.logTexts.forEach((t,i)=>t.setText(this.log[i]?'> '+this.log[i]:''));
+  }
+
+  _refreshUI(){
+    // Enemy torso HP
+    let maxT=this.enemy.maxTorsoHp||this.enemy.torsoHp;
+    let eHpCol=this.enemy.hp>maxT*0.6?'#cc0000':this.enemy.hp>maxT*0.3?'#cc6600':'#ff2222';
+    this.enemyHpTxt.setText(`TORSO: ${this.enemy.hp}/${maxT}`).setColor(eHpCol);
+    this.enemyBodyTxt.setText(this._enemyBodyArt());
+    // No enemyLimbTxt — removed duplicate
+
+    // Enemy limb HP numbers
+    for(let k in this.enemyLimbNumTxts){
+      let t=this.enemyLimbNumTxts[k];
+      if(this.enemy.slimeParts){
+        let sp=this.enemy.slimeParts;
+        if(k==='nucleo') t.setText(`${sp.nucleo.hp}`).setColor(this._limbNumColor(sp.nucleo.hp,sp.nucleo.maxHp));
+        if(k==='masa')   t.setText(`${sp.masa.hp}`).setColor(this._limbNumColor(sp.masa.hp,sp.masa.maxHp));
+      } else {
+        let ld=this.enemy.limbData[k];
+        if(ld&&ld.exists){
+          if(ld.hp<=0) t.setText('✗').setColor('#550000');
+          else t.setText(`${ld.hp}`).setColor(this._limbNumColor(ld.hp,ld.maxHp));
+        }
+      }
+    }
+
+    // Player parts — torso gets special formatted text, others simple numbers
+    let pt=STATE.parts.torso;
+    let torsoCol=this._limbNumColor(pt.cur,pt.max);
+    this.playerTorsoTxt.setText(`TORSO: ${pt.cur}/${pt.max}`).setColor(torsoCol);
+
+    for(let k in this.playerLimbNumTxts){
+      if(k==='torso') continue; // handled above
+      let t=this.playerLimbNumTxts[k];
+      let p=STATE.parts[k];
+      if(p.severed) t.setText('✗').setColor('#550000');
+      else t.setText(`${p.cur}`).setColor(this._limbNumColor(p.cur,p.max));
+    }
+    this.playerBodyTxt.setText(this._playerBodyArt());
+    this.playerSanTxt.setText(`CORDURA: ${STATE.sanity}`).setColor(sanColor(STATE.sanity));
+    // Actualizar DMG
+    let dmgPenR=STATE.getTotalDmgPenalty();
+    let dmgMinR=Math.max(1,8+STATE.buffs.damage-dmgPenR);
+    let dmgMaxR=Math.max(1,18+STATE.buffs.damage-dmgPenR);
+    let dmgColR=dmgPenR===0?'#226622':dmgPenR<5?'#aaaa00':'#cc0000';
+    if(this.playerDmgTxt) this.playerDmgTxt.setText(`DMG: ${dmgMinR}~${dmgMaxR}`).setColor(dmgColR);
+
+    // Refresh Prec y Eva siempre visibles con color dinámico
+    let pen2=STATE.getLimbPenalties();
+    let accDebuff2=this._accDebuff||0;
+    let precPen2=pen2.accLimb+(pen2.accSan||0)+accDebuff2;
+    let evaPen2=pen2.eva;
+    let precVal2=Math.max(0,100-precPen2);
+    let evaVal2=Math.max(0,100-evaPen2);
+    let precStr2=`PREC ${precVal2}%`;
+    let evaStr2=`EVA ${evaVal2}%`;
+    let precCol2=precVal2===100?'#226622':precVal2>=70?'#aaaa00':'#cc0000';
+    let evaCol2=evaVal2===100?'#226622':evaVal2>=70?'#aaaa00':'#cc0000';
+    if(this.playerPrecTxt) this.playerPrecTxt.setText(precStr2).setColor(precCol2);
+    if(this.playerEvaTxt)  this.playerEvaTxt.setText(evaStr2).setColor(evaCol2);
+    // Línea de detalle: explica causas de los debuffs activos
+    let pp2=[];
+    if(pen2.accSan>0 || STATE.getTotalDmgPenalty()>0){
+      let dmgPen2=STATE.getTotalDmgPenalty();
+      let parts=[];
+      if(pen2.accSan>0) parts.push(`-${pen2.accSan}% Prec`);
+      if(dmgPen2>0)     parts.push(`-${dmgPen2} Dmg`);
+      pp2.push(`Mente baja: ${parts.join(', ')}`);
+    }
+    if(accDebuff2>0) pp2.push(`Veneno: -${accDebuff2}% Prec`);
+    this.playerDebuffTxt.setText(pp2.join('  ')).setColor('#aa2200');
+
+    // Refresh enemy debuff display (from severed limbs)
+    let ep=[];
+    let eld=this.enemy.limbData;
+    if(eld){
+      let armLGone=eld.armL&&eld.armL.exists&&eld.armL.hp<=0;
+      let armRGone=eld.armR&&eld.armR.exists&&eld.armR.hp<=0;
+      let legLGone=eld.legL&&eld.legL.exists&&eld.legL.hp<=0;
+      let legRGone=eld.legR&&eld.legR.exists&&eld.legR.hp<=0;
+      if(armLGone||armRGone) ep.push(`-${armLGone&&armRGone?'50':'25'}%Prec`);
+      if(legLGone||legRGone) ep.push(`-${legLGone&&legRGone?'40':'20'}%Eva`);
+    }
+    if(this.enemyDebuffTxt) this.enemyDebuffTxt.setText(ep.join('  ')).setColor(ep.length?'#aa2200':'#333333');
+
+    this._refreshTargetPcts();
+    this._rebuildTargetBtns();
+  }
+
+  // ── Hit chances ────────────────────────────────────────────────
+  _getHitChance(target){
+    // Base chances per target type
+    let base;
+    if(target==='torso') base=70;
+    else if(target==='head') base=25;
+    else if(target==='nucleo'){
+      // Si la masa sigue viva el núcleo tiene evasión perfecta
+      base=this.enemy.slimeParts&&this.enemy.slimeParts.masa.hp>0 ? 0 : 45;
+    }
+    else if(target==='masa') base=62;
+    else if(target==='tallo') base=55;
+    else base=52; // arms/legs
+
+    let pen=STATE.getLimbPenalties().acc;
+    pen+=this._accDebuff||0;
+    let ch=base-pen;
+    // Enemy leg debuff makes it easier to hit them
+    ch+=(this.enemy.evaDebuff||0);
+    if(PLAYER_CLASS.id==='asesino') ch+=12;
+    if(PLAYER_CLASS.id==='hombre_rata') ch+=6;
+    return Math.max(5,Math.round(ch));
+  }
+
+  // ── Player attack ──────────────────────────────────────────────
+  _playerAttack(){
+    if(!this.playerTurn||this.battleOver) return;
+    this.playerTurn=false;
+
+    let target=this.selectedTarget;
+
+    // Validate target still exists
+    if(this.enemy.slimeParts){
+      if(!['nucleo','masa'].includes(target)){ this._addLog('Golpeas la masa.'); target='masa'; }
+      let sp=this.enemy.slimeParts;
+      if(target==='nucleo'&&sp.nucleo.hp<=0){ target='masa'; }
+      if(target==='masa'&&sp.masa.hp<=0){ target='nucleo'; }
+    } else {
+      if(target!=='torso'){
+        let ld=this.enemy.limbData[target];
+        if(!ld||!ld.exists||ld.hp<=0){
+          this._addLog(`${partName(target)} ya destruido. Golpeas el torso.`);
+          target='torso';
+        }
+      }
+    }
+
+    if(!chance(this._getHitChance(target))){
+      this._addLog(`FALLO — ${partName(target)} esquivado.`);
+      SFX.miss();
+      this.time.delayedCall(600,()=>this._enemyTurn()); return;
+    }
+
+    let sanPen=STATE.getSanityPenalties();
+    let baseDmg=Math.max(1, rnd(8,18)+STATE.buffs.damage-sanPen.dmg);
+    let isCrit=this.nextCritical;
+    if(!isCrit && PLAYER_CLASS.id==='asesino' && chance(22)) isCrit=true;
+    if(!isCrit && PLAYER_CLASS.id==='hombre_rata' && chance(15)) isCrit=true;
+    this.nextCritical=false;
+
+    // Damage multipliers
+    let mult={torso:1.0,head:1.8,tallo:0.9,armL:0.65,armR:0.65,legL:0.6,legR:0.6,nucleo:1.9,masa:0.85}[target]||1;
+    let def=this.enemy.def||0;
+    let dmg=Math.max(1,Math.round(baseDmg*mult*(isCrit?2:1))-Math.round(def*0.3));
+
+    let extraMsg='';
+    let flash=()=>{
+      let fl=this.add.rectangle(200,210,180,205,C.BLOOD,0).setDepth(20);
+      this.tweens.add({targets:fl,alpha:{from:0.6,to:0},duration:200});
+      this.cameras.main.shake(isCrit?400:200,isCrit?0.03:0.015);
+      this.cameras.main.flash(isCrit?300:150,80,0,0);
+      if(isCrit) SFX.critHit(); else SFX.playerHit();
+    };
+
+    // ── SLIME ──
+    if(this.enemy.slimeParts){
+      let sp=this.enemy.slimeParts;
+      if(target==='masa'){
+        sp.masa.hp=Math.max(0,sp.masa.hp-dmg);
+        extraMsg=` [Masa: ${sp.masa.hp}/${sp.masa.maxHp}]`;
+        if(sp.masa.hp<=0){
+          extraMsg=' ¡MASA DESTRUIDA! El Núcleo queda expuesto.';
+          this._addLog(`${isCrit?'★CRÍTICO★ ':''}Golpeas Masa por ${dmg}.${extraMsg}`);
+          flash(); this._refreshUI();
+          this.time.delayedCall(700,()=>this._enemyTurn()); return;
+        }
+      } else {
+        // nucleo — solo accesible si masa destruida
+        sp.nucleo.hp=Math.max(0,sp.nucleo.hp-dmg);
+        extraMsg=` [Núcleo: ${sp.nucleo.hp}/${sp.nucleo.maxHp}]`;
+        if(sp.nucleo.hp<=0){
+          sp.nucleo.hp=0; this.enemy.hp=0;
+          this._addLog(`${isCrit?'★CRÍTICO★ ':''}¡NÚCLEO REVENTADO! ${dmg} DMG. ¡EL SLIME SE DISUELVE!`);
+          flash(); this._refreshUI(); this._winBattle(); return;
+        }
+      }
+      this._addLog(`${isCrit?'★CRÍTICO★ ':''}Golpeas ${partName(target)} por ${dmg}.${extraMsg}`);
+      flash(); this._refreshUI();
+      this.time.delayedCall(700,()=>this._enemyTurn()); return;
+    }
+
+    // ── HEAD ──
+    if(target==='head'){
+      let ld=this.enemy.limbData.head;
+      ld.hp=Math.max(0,ld.hp-dmg);
+      extraMsg=` [Cabeza: ${ld.hp}/${ld.maxHp}]`;
+      if(ld.hp<=0){
+        // Instant kill
+        this._addLog(`${isCrit?'★CRÍTICO★ ':''}Golpeas Cabeza por ${dmg}.${extraMsg} ¡CRÁNEO DESTRUIDO!`);
+        this.enemy.hp=0;
+        this.cameras.main.shake(600,0.05); this.cameras.main.flash(400,150,20,0);
+        let fl=this.add.rectangle(200,210,180,205,C.BLOOD,0).setDepth(20);
+        this.tweens.add({targets:fl,alpha:{from:0.8,to:0},duration:300});
+        this._refreshUI(); this._winBattle(); return;
+      } else if(chance(20)&&ld.hp<=ld.maxHp*0.4){
+        // Low HP head: chance of instant sever
+        this._addLog(`${isCrit?'★CRÍTICO★ ':''}Golpeas Cabeza por ${dmg}.${extraMsg} ¡CABEZA VOLADA!`);
+        this.enemy.hp=0;
+        flash(); this._refreshUI(); this._winBattle(); return;
+      }
+    }
+    // ── TORSO ──
+    else if(target==='torso'){
+      this.enemy.hp=Math.max(0,this.enemy.hp-dmg);
+      this._addLog(`${isCrit?'★CRÍTICO★ ':''}Golpeas Torso por ${dmg}. [${this.enemy.hp}/${this.enemy.maxTorsoHp||this.enemy.torsoHp}]`);
+      flash(); this._refreshUI();
+      if(this.enemy.hp<=0){ this._winBattle(); return; }
+      this.time.delayedCall(700,()=>this._enemyTurn()); return;
+    }
+    // ── LIMB (tallo, armL, armR, legL, legR) ──
+    else {
+      let ld=this.enemy.limbData[target];
+      if(ld){
+        ld.hp=Math.max(0,ld.hp-dmg);
+        extraMsg=` [${partName(target)}: ${ld.hp}/${ld.maxHp}]`;
+        if(ld.hp<=0 && chance(ld.severChance)){
+          ld.hp=0;
+          extraMsg=' ¡AMPUTADO!';
+          // Apply effect
+          if(ld.effect==='dmg') this.enemy.att=Math.max(2,Math.round(this.enemy.att*(1+ld.effectVal)));
+          if(ld.effect==='acc') this.enemy.acc=Math.max(10,this.enemy.acc+ld.effectVal);
+          if(ld.effect==='eva'){ this.enemy.evaDebuff=(this.enemy.evaDebuff||0)+Math.abs(ld.effectVal); }
+          // Disable specials that require this limb
+          this.enemy.specialActs=this.enemy.specialActs.filter(sa=>{
+            if(sa.requiredLimb===target){
+              this._addLog(`¡${this.enemy.name} ya no puede usar ${sa.name}!`);
+              return false;
+            }
+            return true;
+          });
+        } else if(ld.hp<=0){
+          extraMsg+=` [dañado, no amputado]`;
+        }
+      }
+    }
+
+    let msg=`${isCrit?'★CRÍTICO★ ':''}Golpeas ${partName(target)} por ${dmg}.${extraMsg}`;
+    this._addLog(msg); STATE.addLog(msg);
+    flash(); this._refreshUI();
+
+    if(this.enemy.hp<=0){ this._winBattle(); return; }
+    this.time.delayedCall(700,()=>this._enemyTurn());
+  }
+
+  _playerDefend(){
+    if(!this.pendingSpecial||this.battleOver) return;
+    let special=this.pendingSpecial;
+    this.pendingSpecial=null;
+    this.defendBtn.setVisible(false);
+    this.telegraphTxt.setVisible(false);
+    this.atkBtn.setVisible(true);
+    this.fleeBtn.setVisible(true);
+    this.playerTurn=false;
+
+    if(chance(special.evadeChance||60)){
+      this._addLog(`Te cubres a tiempo. ¡${this.enemy.name} falla!`);
+      this.cameras.main.flash(300,0,80,0);
+      this.time.delayedCall(600,()=>this._enemyTurn());
+    } else {
+      this._addLog('No fue suficiente. El ataque te alcanza de todas formas.');
+      special.fn(this);
+      this._refreshUI();
+      if(STATE.sanity<=0){ STATE.deathCause='insanity'; this._insanityDeath(); return; }
+      if(!STATE.isAlive()){ this._checkDeath(); return; }
+      this.time.delayedCall(600,()=>this._enemyTurn());
+    }
+  }
+
+  _flee(){
+    if(!this.playerTurn||this.battleOver||this.isBoss) return;
+    this.playerTurn=false;
+    let sanCost=rnd(10,20);
+    STATE.sanity=Math.max(0,STATE.sanity-sanCost); clampSanity();
+    SFX.flee();
+    if(chance(30)){
+      STATE.addLog(`[NV${STATE.level}] HUISTE. -${sanCost} CORDURA.`);
+      this._addLog(`Huyes. -${sanCost} SAN.`);
+      if(STATE.sanity<=0){ STATE.deathCause='insanity'; this._insanityDeath(); return; }
+      STATE.level++;
+      this.cameras.main.fadeOut(300,0,0,0);
+      this.time.delayedCall(300,()=>this.scene.start('SceneMap'));
+    } else {
+      this._addLog(`Intentas huir. El enemigo te bloquea. -${sanCost} SAN.`);
+      this._refreshUI();
+      if(STATE.sanity<=0){ STATE.deathCause='insanity'; this._insanityDeath(); return; }
+      this.time.delayedCall(600,()=>this._enemyTurn());
+    }
+  }
+
+  // ── Enemy turn ─────────────────────────────────────────────────
+  _enemyTurn(){
+    if(this.battleOver) return;
+    if(this.enemyStunned){ this.enemyStunned=false; this._addLog(`${this.enemy.name} aturdido. Pierde su turno.`); this.playerTurn=true; return; }
+
+    // Check for telegraphed special
+    let availableSpecials=this.enemy.specialActs.filter(sa=>chance(sa.chance));
+    if(availableSpecials.length>0){
+      let sa=availableSpecials[0];
+      // Check requiredLimb
+      if(sa.requiredLimb){
+        let ld=this.enemy.limbData[sa.requiredLimb];
+        if(ld&&ld.hp<=0){
+          // Skip, limb gone
+        } else {
+          this._telegraphSpecial(sa); return;
+        }
+      } else {
+        this._telegraphSpecial(sa); return;
+      }
+    }
+
+    // Boss uses special system
+    if(this.isBoss&&chance(28)&&!this.pendingSpecial){
+      this._telegraphBossSpecial(); return;
+    }
+
+    // Normal attack — possibly double attack
+    let doubleAttack=chance(18);
+    this._doEnemyHit();
+    if(doubleAttack && !this.battleOver && STATE.isAlive()){
+      this.time.delayedCall(500,()=>{
+        if(!this.battleOver) this._doEnemyHit(true);
+      });
+    }
+  }
+
+  _doEnemyHit(isSecond=false){
+    if(this.battleOver) return;
+
+    let pen=STATE.getLimbPenalties();
+    let evaBonus=STATE.buffs.evasion+pen.eva;
+    if(chance(12+evaBonus)){
+      this._addLog(`${this.enemy.name} falla${isSecond?' (2º golpe)':''}. Lo esquivas.`);
+      if(!isSecond) this.playerTurn=true;
+      return;
+    }
+
+    let enemyAcc=this.enemy.acc||70;
+    if(!chance(enemyAcc)){
+      this._addLog(`${this.enemy.name} falla el ataque${isSecond?' (2º)':''}.`);
+      if(!isSecond) this.playerTurn=true;
+      return;
+    }
+
+    // Determine which part to hit based on attackDist
+    let target=this._rollEnemyTarget();
+    let dmg=rnd(Math.round(this.enemy.att*0.6),this.enemy.att);
+    // Reduce dmg if arms lost
+    let ld=this.enemy.limbData;
+    if(ld.armL&&ld.armR){
+      let aLgone=ld.armL.hp<=0, aRgone=ld.armR.hp<=0;
+      if(aLgone&&aRgone) dmg=Math.round(dmg*0.45);
+      else if(aLgone||aRgone) dmg=Math.round(dmg*0.75);
+    }
+
+    // Apply damage to the correct player part
+    let part=STATE.parts[target];
+    if(!part||part.severed){
+      // Hit torso instead
+      target='torso';
+      part=STATE.parts.torso;
+    }
+
+    part.cur=Math.max(0,part.cur-dmg);
+    let flash=()=>{
+      let pf=this.add.rectangle(600,245,175,220,C.BLOOD,0).setDepth(20);
+      this.tweens.add({targets:pf,alpha:{from:0.5,to:0},duration:250});
+      SFX.playerTakesHit();
+    };
+
+    // Head hit at 0 = instant lethal (no sever needed)
+    if(target==='head' && part.cur<=0){
+      this._addLog(`${this.enemy.name}${isSecond?' (2º)':''} destruye tu CABEZA. -${dmg}. ¡MUERTE INSTANTÁNEA!`);
+      this.cameras.main.shake(800,0.06); this.cameras.main.flash(700,180,0,0);
+      flash();
+      this._refreshUI();
+      this.time.delayedCall(400,()=>this._checkDeath());
+      return;
+    }
+
+    // Check for sever chance on player limbs (not head/torso)
+    if(target!=='torso'&&target!=='head'&&part.cur<=0&&chance(35)){
+      part.severed=true;
+      SFX.limbLost();
+      this._addLog(`${this.enemy.name}${isSecond?' (2º)':''} destroza tu ${partName(target)}! -${dmg}. ¡EXTREMIDAD PERDIDA!`);
+      this.cameras.main.shake(600,0.04); this.cameras.main.flash(500,150,0,0);
+    } else {
+      this._addLog(`${this.enemy.name}${isSecond?' (2º)':''} golpea tu ${partName(target)}. -${dmg}. [${part.cur}/${part.max}]`);
+      this.cameras.main.shake(200,0.018); this.cameras.main.flash(150,80,0,0);
+    }
+
+    flash();
+    if(this.isBoss){ STATE.sanity-=rnd(2,5); clampSanity(); }
+    this._refreshUI();
+
+    if(STATE.sanity<=0){ STATE.deathCause='insanity'; this._insanityDeath(); return; }
+    if(!STATE.isAlive()){ this._checkDeath(); return; }
+    if(!isSecond) this.playerTurn=true;
+    else {
+      // After second hit
+      this.time.delayedCall(300,()=>{
+        if(!this.battleOver) this.playerTurn=true;
+      });
+    }
+  }
+
+  _rollEnemyTarget(){
+    let dist=this.enemy.attackDist||{torso:60,head:15,armL:8,armR:8,legL:4,legR:5};
+    // Filter to only hit existing player parts
+    let filtered={};
+    let total=0;
+    for(let k in dist){
+      let p=STATE.parts[k];
+      if(p&&!p.severed&&dist[k]>0){ filtered[k]=dist[k]; total+=dist[k]; }
+    }
+    if(total===0) return 'torso';
+    let r=Math.random()*total;
+    let acc=0;
+    for(let k in filtered){ acc+=filtered[k]; if(r<acc) return k; }
+    return 'torso';
+  }
+
+  // ── Special telegraph ──────────────────────────────────────────
+  _telegraphSpecial(sa){ SFX.enemySpecial();
+    this.pendingSpecial=sa;
+    this.atkBtn.setVisible(false);
+    this.fleeBtn.setVisible(false);
+    this.defendBtn.setVisible(true);
+    this.telegraphTxt.setText(sa.msg).setVisible(true);
+    this.cameras.main.shake(300,0.012); this.cameras.main.flash(600,80,0,0);
+    this._addLog(sa.msg);
+    this.playerTurn=true;
+  }
+
+  // ── Boss specials ──────────────────────────────────────────────
+  static get BOSS_SPECIALS(){ return [
+    {
+      name:'ABRAZO',
+      msg:'★ EL INNOMBRABLE EXTIENDE SUS BRAZOS A TU ALREDEDOR. ★  [ DEFENDERSE ]',
+      evadeChance:35,
+      fn(scene){
+        STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-55);
+        STATE.parts.armL.severed=true; STATE.parts.armL.cur=0;
+        STATE.parts.armR.severed=true; STATE.parts.armR.cur=0;
+        scene._addLog('¡TE APLASTA! -55 TORSO. ¡AMBOS BRAZOS PERDIDOS!');
+        scene.cameras.main.shake(900,0.06);
+      }
+    },
+    {
+      name:'FAUCES',
+      msg:'★ EL INNOMBRABLE ABRE SUS FAUCES BAJO TUS PIES. ★  [ DEFENDERSE ]',
+      evadeChance:40,
+      fn(scene){
+        let dmg=rnd(35,50);
+        STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+        scene._addLog(`¡FAUCES DEL VACÍO! -${dmg} TORSO.`);
+        scene.cameras.main.shake(800,0.06);
+      }
+    },
+    {
+      name:'GRITO',
+      msg:'★ EL INNOMBRABLE INHALA. VA A GRITAR. ★  [ DEFENDERSE ]',
+      evadeChance:38,
+      fn(scene){
+        STATE.sanity-=45; clampSanity();
+        let dmg=rnd(20,30);
+        STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+        scene._addLog(`¡GRITO PRIMORDIAL! -${dmg} CABEZA. -45 CORDURA.`);
+        scene.cameras.main.shake(900,0.06); scene.cameras.main.flash(900,80,0,80);
+      }
+    },
+    {
+      name:'DEVOUR',
+      msg:'★ EL INNOMBRABLE APUNTA A TU CABEZA CON ALGO QUE NO DEBERÍA EXISTIR. ★  [ DEFENDERSE ]',
+      evadeChance:30,
+      fn(scene){
+        let dmg=rnd(40,55);
+        STATE.parts.head.cur=Math.max(0,STATE.parts.head.cur-dmg);
+        scene._addLog(`¡DEVORAR! -${dmg} CABEZA. Si llega a 0, mueres.`);
+        scene.cameras.main.shake(900,0.07);
+      }
+    },
+    {
+      name:'LLUVIA ÁCIDA',
+      msg:'★ EL INNOMBRABLE ABRE SUS POROS. LLUVIA ÁCIDA. ★  [ DEFENDERSE ]',
+      evadeChance:38,
+      fn(scene){
+        let dmg=rnd(20,30);
+        STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+        scene._accDebuff=(scene._accDebuff||0)+22;
+        scene._addLog(`¡LLUVIA ÁCIDA! -${dmg} TORSO. -22% Precisión hasta fin del combate.`);
+        scene.cameras.main.flash(700,80,50,0);
+      }
+    },
+    {
+      name:'TENTÁCULOS',
+      msg:'★ EL INNOMBRABLE EXTIENDE DOS TENTÁCULOS. VA A ARRANCARTE LAS PIERNAS. ★  [ DEFENDERSE ]',
+      evadeChance:32,
+      fn(scene){
+        let dmg=rnd(30,45);
+        STATE.parts.torso.cur=Math.max(0,STATE.parts.torso.cur-dmg);
+        let armsLost=[];
+        ['legL','legR'].forEach(k=>{
+          if(!STATE.parts[k].severed){ STATE.parts[k].severed=true; STATE.parts[k].cur=0; armsLost.push(partName(k)); }
+        });
+        scene._addLog(`¡TENTÁCULOS! -${dmg} TORSO. ${armsLost.length?'¡Arranca '+armsLost.join(' y ')+'!':''}`);
+        scene.cameras.main.shake(800,0.06);
+      }
+    },
+  ]; }
+
+  _telegraphBossSpecial(){
+    let special=SceneBattle.BOSS_SPECIALS[rnd(0,SceneBattle.BOSS_SPECIALS.length-1)];
+    this.pendingSpecial=special;
+    this.atkBtn.setVisible(false);
+    this.fleeBtn.setVisible(false);
+    this.defendBtn.setVisible(true);
+    this.telegraphTxt.setText(special.msg).setVisible(true);
+    this.cameras.main.shake(300,0.012); this.cameras.main.flash(600,80,0,0);
+    this._addLog(special.msg);
+    this.playerTurn=true;
+  }
+
+  // ── Win / Lose ─────────────────────────────────────────────────
+  _winBattle(){
+    this.battleOver=true;
+    this._accDebuff=0;
+    let gold=rnd(10,30)*(this.isBoss?3:1);
+    STATE.gold+=gold;
+    STATE.addLog(`[NV${STATE.level}] VICTORIA vs ${this.enemy.name}. +${gold} Oro.`);
+    this._addLog(`${this.enemy.name} CAE. +${gold} Oro.`);
+
+    // Heal on victory — distributed
+    let healAmt=rnd(5,12);
+    let msgs=STATE.healDistribute(healAmt);
+    this._addLog(`Adrenalina. Curación: ${msgs.join(', ')}`);
+
+    let buffRoll=rnd(1,4);
+    if(buffRoll===1){ STATE.buffs.damage+=3; this._addLog('La violencia te enseña. +3 Daño permanente.'); }
+    else if(buffRoll===2){ STATE.buffs.evasion+=5; this._addLog('Aprendes sus movimientos. +5% Evasión permanente.'); }
+    else if(buffRoll===3){
+      // Restore some HP to worst part
+      let worst=Object.entries(STATE.parts).filter(([k,p])=>!p.severed).sort((a,b)=>(a[1].cur/a[1].max)-(b[1].cur/b[1].max))[0];
+      if(worst){ let [k,p]=worst; let gain=Math.min(12,p.max-p.cur); p.cur+=gain; this._addLog(`La adrenalina regenera. +${gain} ${partName(k)}.`); }
+    }
+    else { let sr=rnd(8,18); STATE.sanity=Math.min(100,STATE.sanity+sr); this._addLog(`Matar algo real calma las voces. +${sr} CORDURA.`); }
+
+    SFX.victory();
+    this.cameras.main.flash(500,0,60,0);
+    this.time.delayedCall(2200,()=>{ STATE.level++;
+      SFX.advance();
+      this.cameras.main.fadeOut(400,0,0,0);
+      this.time.delayedCall(400,()=>this.scene.start('SceneMap'));
+    });
+  }
+
+  _checkDeath(){
+    if(this.battleOver) return;
+    if(!this.coinUsed && !STATE.coinUsed){
+      this._triggerDeathDoor();
+    } else {
+      this._loseBattle();
+    }
+  }
+
+  _triggerDeathDoor(){
+    if(this.battleOver) return;
+    this.battleOver=true;
+    this._refreshUI();
+    this._addLog('★ CAES — LA MUERTE ESPERA. ★');
+    this.cameras.main.shake(600,0.04); this.cameras.main.flash(800,150,0,0);
+
+    this.time.delayedCall(900,()=>{
+      let dimmer=this.add.rectangle(W/2,H/2,W,H,0x000000,0).setDepth(30);
+      this.tweens.add({targets:dimmer,alpha:0.82,duration:500});
+      let panel=this.add.rectangle(W/2,290,520,260,0x0a0005,0).setDepth(31);
+      this.tweens.add({targets:panel,alpha:1,duration:400,delay:200});
+
+      let title=this.add.text(W/2,180,'— LLEGAS A LAS PUERTAS —',{
+        fontFamily:'Cinzel Decorative',fontSize:'22px',color:'#cc0000',
+        stroke:'#000',strokeThickness:4,shadow:{color:'#ff0000',blur:20,fill:true}
+      }).setOrigin(0.5).setDepth(32).setAlpha(0);
+      this.tweens.add({targets:title,alpha:1,duration:600,delay:300});
+
+      let sub=this.add.text(W/2,240,'La muerte te observa.\nTodavía tienes una moneda en el bolsillo.',{
+        fontFamily:'Share Tech Mono',fontSize:'14px',color:'#888888',align:'center'
+      }).setOrigin(0.5).setDepth(32).setAlpha(0);
+      this.tweens.add({targets:sub,alpha:1,duration:600,delay:500});
+
+      let coinBig=this.add.text(W/2,315,'[ ☽  LANZAR LA ÚLTIMA MONEDA  ☽ ]',{
+        fontFamily:'Share Tech Mono',fontSize:'16px',color:'#ffaa00',
+        stroke:'#110000',strokeThickness:3,
+        backgroundColor:'#1a0800',padding:{x:14,y:9}
+      }).setOrigin(0.5).setDepth(32).setAlpha(0).setInteractive({useHandCursor:true});
+      this.tweens.add({targets:coinBig,alpha:{from:0.3,to:1},duration:500,yoyo:true,repeat:-1,delay:700});
+      coinBig.on('pointerover',()=>{coinBig.setColor('#ffffff');coinBig.setScale(1.04);});
+      coinBig.on('pointerout', ()=>{coinBig.setColor('#ffaa00');coinBig.setScale(1);});
+      coinBig.on('pointerdown',()=>{
+        this.tweens.killTweensOf(coinBig);
+        dimmer.destroy(); panel.destroy(); title.destroy(); sub.destroy(); coinBig.destroy();
+        this.battleOver=false;
+        this.coinUsed=true; STATE.coinUsed=true;
+        this._executeCoinFlip();
+      });
+    });
+  }
+
+  _executeCoinFlip(){
+    this._addLog('★ LANZAS LA ÚLTIMA MONEDA ★');
+    this.cameras.main.shake(300,0.015);
+    this.time.delayedCall(1000,()=>{
+      if(chance(50)){
+        // Restore: heal all parts and restore a severed limb
+        let msgs=STATE.healDistribute(40);
+        this.enemyStunned=true;
+        // Restore one severed limb if any
+        let severed=Object.entries(STATE.parts).filter(([k,p])=>p.severed&&k!=='head'&&k!=='torso');
+        if(severed.length){
+          let [k,p]=severed[rnd(0,severed.length-1)];
+          p.severed=false; p.cur=Math.ceil(p.max*0.5);
+          this._addLog(`CARA — La muerte te escupe. ${msgs.join(', ')}. Recuperas ${partName(k)}. Enemigo aturdido.`);
+        } else {
+          this._addLog(`CARA — La muerte te escupe. ${msgs.join(', ')}. Enemigo aturdido.`);
+        }
+        this.cameras.main.flash(700,0,80,0);
+        this._refreshUI(); this.playerTurn=true;
+      } else {
+        // Kill the torso fully
+        STATE.parts.torso.cur=0;
+        this._addLog('CRUZ — La fortuna te abandona.');
+        this.cameras.main.shake(900,0.06); this.cameras.main.flash(900,180,0,0);
+        this._refreshUI();
+        this.time.delayedCall(1500,()=>this._loseBattle());
+      }
+    });
+  }
+
+  _loseBattle(){ SFX.playerDeath();
+    this.battleOver=true;
+    STATE.addLog(`[NV${STATE.level}] MUERTO por ${this.enemy.name}.`);
+    this._addLog('Caes al suelo. La oscuridad te reclama.');
+    this.cameras.main.shake(800,0.05); this.cameras.main.flash(1000,150,0,0);
+    this.time.delayedCall(2500,()=>{ this.cameras.main.fadeOut(600,0,0,0);
+      this.time.delayedCall(600,()=>this.scene.start('SceneGameOver'));
+    });
+  }
+
+  _insanityDeath(){ SFX.insanityDeath();
+    this.battleOver=true;
+    this._addLog('Tu mente se quiebra. Ya eres parte de la oscuridad.');
+    this.cameras.main.shake(1000,0.04); this.cameras.main.flash(1000,30,0,40);
+    this.time.delayedCall(2800,()=>{ this.cameras.main.fadeOut(600,0,0,0);
+      this.time.delayedCall(600,()=>this.scene.start('SceneInsanity'));
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCENE: GAME OVER
+// ═══════════════════════════════════════════════════════════════
+class SceneGameOver extends Phaser.Scene {
+  constructor(){ super('SceneGameOver'); }
+  create(){
+    SFX.gameOver();
+    this.cameras.main.fadeIn(600,0,0,0);
+    this.add.rectangle(W/2,H/2,W,H,C.BLACK);
+    for(let i=0;i<40;i++) this.add.rectangle(rnd(0,W),rnd(0,H),rnd(1,4),rnd(30,150),C.RED,rnd(3,12)/100);
+
+    this.add.text(W/2,145,'HAS MUERTO',{
+      fontFamily:'Cinzel Decorative',fontSize:'68px',color:'#cc0000',
+      stroke:'#000',strokeThickness:6,shadow:{color:'#ff0000',blur:40,offsetX:2,offsetY:2,fill:true}
+    }).setOrigin(0.5);
+    this.add.text(W/2,245,`${PLAYER_NAME} — El descenso fue demasiado.`,{fontFamily:'Share Tech Mono',fontSize:'15px',color:'#555'}).setOrigin(0.5);
+
+    let p=STATE.parts;
+    let stats=[
+      `Clase: ${PLAYER_CLASS.name}`,
+      `Nivel alcanzado: ${STATE.level}`,
+      `Torso final: ${p.torso.cur}/${p.torso.max}  Cabeza: ${p.head.severed?'AMPUTADA':p.head.cur+'/'+p.head.max}`,
+      `Cordura: ${STATE.sanity}`,
+      `Oro acumulado: ${STATE.gold}`,
+      `Extremidades perdidas: ${Object.entries(p).filter(([k,v])=>v.severed).length}/4`,
+    ];
+    stats.forEach((s,i)=>this.add.text(W/2,290+i*22,s,{fontFamily:'Share Tech Mono',fontSize:'13px',color:'#555'}).setOrigin(0.5));
+
+    this.add.text(W/2,440,'— ÚLTIMAS PALABRAS —',{fontFamily:'Share Tech Mono',fontSize:'11px',color:'#2a2a2a'}).setOrigin(0.5);
+    STATE.log.slice(0,3).forEach((l,i)=>this.add.text(W/2,454+i*15,'> '+l.slice(0,85),{fontFamily:'Share Tech Mono',fontSize:'10px',color:'#1a1a1a'}).setOrigin(0.5));
+
+    let btn=this.add.text(W/2,548,'[ REINICIAR MAZMORRA ]',{fontFamily:'Share Tech Mono',fontSize:'17px',color:'#cc0000'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    btn.on('pointerover',()=>btn.setColor('#ff4444'));
+    btn.on('pointerout', ()=>btn.setColor('#cc0000'));
+    btn.on('pointerdown',()=>{ STATE.reset(); this.cameras.main.fadeOut(400,0,0,0); this.time.delayedCall(400,()=>this.scene.start('SceneMenu')); });
+    this.tweens.add({targets:btn,alpha:{from:0.3,to:1},duration:900,yoyo:true,repeat:-1});
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PHASER CONFIG
+// ═══════════════════════════════════════════════════════════════
+new Phaser.Game({
+  type:Phaser.AUTO, width:W, height:H,
+  backgroundColor:'#000000', parent:'game-container',
+  scene:[SceneMenu,SceneMap,SceneBattle,SceneEvent,SceneInsanity,SceneGameOver],
+  render:{antialias:false,pixelArt:true}
+});
+</script>
+</body>
+</html>
